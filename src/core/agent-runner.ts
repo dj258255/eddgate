@@ -15,8 +15,14 @@ import { createDefaultAdapter } from "./llm-adapter.js";
 
 let defaultAdapter: LLMAdapter | null = null;
 
+let globalEffort: string | undefined;
+
 export function setAdapter(adapter: LLMAdapter): void {
   defaultAdapter = adapter;
+}
+
+export function setEffort(effort: string): void {
+  globalEffort = effort;
 }
 
 function getAdapter(): LLMAdapter {
@@ -65,6 +71,7 @@ export async function runAgent(
         systemPrompt,
         prompt: fullInput,
         tools: context.tools.length > 0 ? context.tools : undefined,
+        effort: globalEffort,
       });
 
       tracer.llmCall(stepId, {

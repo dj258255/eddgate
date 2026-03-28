@@ -27,6 +27,7 @@ export interface LLMAdapter {
     systemPrompt: string;
     prompt: string;
     tools?: string[];
+    effort?: string;
   }): Promise<LLMResponse>;
 
   /**
@@ -50,15 +51,13 @@ export class ClaudeSDKAdapter implements LLMAdapter {
     systemPrompt: string;
     prompt: string;
     tools?: string[];
+    effort?: string;
   }): Promise<LLMResponse> {
-    // Dynamic import so Claude SDK is not required at load time
     const { query } = await import("@anthropic-ai/claude-agent-sdk");
-    const { SDKResultSuccess } = await import("@anthropic-ai/claude-agent-sdk").then(() => ({
-      SDKResultSuccess: null, // type only, not runtime
-    }));
 
     const model = resolveModel(options.model);
     const allowedTools = options.tools?.length ? mapTools(options.tools) : undefined;
+    const effort = options.effort as "low" | "medium" | "high" | "max" | undefined;
 
     const start = performance.now();
 
@@ -76,6 +75,7 @@ export class ClaudeSDKAdapter implements LLMAdapter {
         maxTurns: 10,
         persistSession: false,
         tools: !options.tools?.length ? [] : undefined,
+        ...(effort ? { effort } : {}),
       },
     });
 

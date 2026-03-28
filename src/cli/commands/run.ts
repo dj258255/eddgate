@@ -8,6 +8,7 @@ import {
 } from "../../config/loader.js";
 import { interactiveSetup } from "../interactive-setup.js";
 import { executeWorkflow } from "../../core/workflow-engine.js";
+import { setEffort } from "../../core/agent-runner.js";
 import {
   TraceEmitter,
   createStdoutListener,
@@ -20,6 +21,7 @@ import type { WorkflowResult } from "../../types/index.js";
 interface RunOptions {
   input?: string;
   model?: string;
+  effort?: string;
   config: string;
   workflowsDir: string;
   rolesDir: string;
@@ -60,14 +62,18 @@ export async function runCommand(
         return;
       }
       workflow.config.defaultModel = setup.model;
+      if (setup.effort && setup.effort !== "medium") setEffort(setup.effort);
       if (setup.maxBudgetUsd) options.maxBudgetUsd = setup.maxBudgetUsd;
       if (setup.outputReport) options.report = setup.outputReport;
       if (setup.traceJsonl) options.traceJsonl = setup.traceJsonl;
     }
 
-    // CLI --model 오버라이드 (interactive보다 우선)
+    // CLI --model/--effort 오버라이드 (interactive보다 우선)
     if (options.model && !options.interactive) {
       workflow.config.defaultModel = options.model;
+    }
+    if (options.effort && !options.interactive) {
+      setEffort(options.effort);
     }
 
     // 프로젝트 설정 로드 (선택적)

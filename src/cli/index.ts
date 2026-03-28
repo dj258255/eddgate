@@ -43,6 +43,7 @@ program
   .description("Run a workflow")
   .option("-i, --input <file>", "Input file or text")
   .option("-m, --model <model>", "Override model (sonnet, opus, haiku)")
+  .option("-e, --effort <level>", "Effort level (low, medium, high, max)")
   .option("-c, --config <path>", "Config file", "./eddgate.config.yaml")
   .option("-w, --workflows-dir <path>", "Workflows directory", "./workflows")
   .option("-p, --prompts-dir <path>", "Prompts directory", "./prompts")
