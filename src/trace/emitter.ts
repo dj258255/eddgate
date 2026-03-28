@@ -13,13 +13,13 @@ type TraceListener = (event: TraceEvent) => void | Promise<void>;
 /**
  * Trace Emitter
  *
- * 관측 가능한 프레임워크의 핵심.
- * 자체 플랫폼이 아닌 이벤트 발행 + 플러거블 출력.
+ * Core of the observable framework.
+ * Event emission + pluggable outputs, not a custom platform.
  *
- * 출력:
- * - stdout: 사람이 읽을 수 있는 요약 (항상)
- * - jsonl: 기계가 읽을 수 있는 전체 트레이스 (선택)
- * - langfuse/otel: 외부 통합 (선택)
+ * Outputs:
+ * - stdout: Human-readable summary (always)
+ * - jsonl: Machine-readable full trace (optional)
+ * - langfuse/otel: External integration (optional)
  */
 export class TraceEmitter {
   private traceId: string;
@@ -63,7 +63,7 @@ export class TraceEmitter {
       try {
         listener(event);
       } catch {
-        // 리스너 실패가 실행을 중단하면 안 됨
+        // Listener failures must not break execution
       }
     }
 
@@ -188,7 +188,7 @@ function formatDetail(event: TraceEvent): string | null {
       const tokens = event.data.inputTokens
         ? ` (${((event.data.inputTokens ?? 0) + (event.data.outputTokens ?? 0)).toLocaleString()} tokens)`
         : "";
-      return `← 완료 ${formatMs(event.data.latencyMs)}${tokens}`;
+      return `← done ${formatMs(event.data.latencyMs)}${tokens}`;
     }
     case "llm_call":
       return `${event.data.model} (${event.data.inputTokens}→${event.data.outputTokens} tokens, ${formatMs(event.data.latencyMs)})`;

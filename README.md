@@ -188,6 +188,30 @@ steps:
       onFail: "block"
 ```
 
+## Parallel Execution
+
+Independent steps run in parallel automatically with `topology: "parallel"`:
+
+```yaml
+config:
+  topology: "parallel"  # independent steps run concurrently
+
+steps:
+  - id: "search_docs"
+    type: "retrieve"
+    tools: ["web_search"]
+
+  - id: "search_code"
+    type: "retrieve"
+    tools: ["file_read"]
+
+  - id: "combine"
+    type: "generate"
+    dependsOn: ["search_docs", "search_code"]  # waits for both
+```
+
+`search_docs` and `search_code` run simultaneously. `combine` waits for both. Typical speedup: 30-40% for workflows with independent retrieval steps.
+
 ## LLM Support
 
 Auto-detects backend:

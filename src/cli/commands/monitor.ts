@@ -1,3 +1,4 @@
+import { loadAllTraces } from "../../trace/trace-loader.js";
 import { readFile, readdir } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import chalk from "chalk";
@@ -197,19 +198,3 @@ function formatMs(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-async function loadAllTraces(dir: string): Promise<TraceEvent[]> {
-  const files = await readdir(dir).catch(() => []);
-  const events: TraceEvent[] = [];
-
-  for (const file of files) {
-    if (!file.endsWith(".jsonl")) continue;
-    const content = await readFile(join(dir, file), "utf-8");
-    for (const line of content.split("\n").filter(Boolean)) {
-      try {
-        events.push(JSON.parse(line) as TraceEvent);
-      } catch { /* skip */ }
-    }
-  }
-
-  return events;
-}

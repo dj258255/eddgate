@@ -7,10 +7,10 @@ import type {
 /**
  * Context Builder
  *
- * 최소 실행 컨텍스트 생성. 재현 가능성이 핵심.
+ * Build minimal execution context. Reproducibility is key.
  *
- * 원칙:
- * - 100토큰 요약 > 10,000토큰 raw
+ * Principles:
+ * - 100-token summary > 10,000-token raw
  * - 이전 단계 결과는 필요할 때만 명시적으로 주입
  * - Context rot 방지: 50K 토큰 이전에 열화 시작 (Chroma 연구)
  */
@@ -34,14 +34,14 @@ export function buildContext(
     tools: step.context.tools,
   };
 
-  // Context Engineering: retrieve 단계에서는 실행 컨텍스트(이전 단계 결과)를
-  // 검색 쿼리에 포함하지 않는다. 검색은 근거 정보만 다뤄야 함.
-  // "실행 컨텍스트는 Search Query에 포함 금지" 규칙 코드 강제.
+  // Context Engineering: retrieve steps must not include execution context
+  // in search queries. Search must only handle evidence data.
+  // "Execution context must not appear in Search Query" -- enforced in code.
   if (step.type === "retrieve") {
-    return ctx; // 이전 단계 결과 주입 없이 반환
+    return ctx; // Return without injecting previous step results
   }
 
-  // 이전 단계 결과 주입 (dependsOn이 있을 때만, retrieve 제외)
+  // Inject previous step results (only when dependsOn set, exclude retrieve)
   if (step.dependsOn?.length) {
     const summaries: string[] = [];
 
@@ -67,8 +67,8 @@ export function buildContext(
 }
 
 /**
- * 이전 단계 출력을 요약.
- * "적을수록 낫다" — 핵심 정보만 추출.
+ * Summarize previous step output.
+ * "Less is more" -- extract key info only.
  */
 function summarizeOutput(stepId: string, output: unknown): string {
   if (output === null || output === undefined) {
@@ -77,20 +77,20 @@ function summarizeOutput(stepId: string, output: unknown): string {
 
   const str = typeof output === "string" ? output : JSON.stringify(output);
 
-  // 400자(≈100토큰) 이하면 그대로
+  // Under 400 chars (~100 tokens) -- use as-is
   if (str.length <= 400) {
     return `[${stepId}]: ${str}`;
   }
 
-  // 초과 시 앞뒤 잘라서 요약
+  // Over limit -- truncate head+tail
   const head = str.slice(0, 200);
   const tail = str.slice(-150);
-  return `[${stepId}]: ${head}...[중략]...${tail}`;
+  return `[${stepId}]: ${head}...[truncated]...${tail}`;
 }
 
 /**
- * 첫 번째 의존성의 전체 출력 반환.
- * 직전 단계의 산출물이 다음 단계의 주 입력이 되는 경우.
+ * Return full output of primary dependency.
+ * When the previous step output becomes the next step input.
  */
 function getPrimaryDependencyOutput(
   dependsOn: string[],
@@ -106,8 +106,8 @@ function getPrimaryDependencyOutput(
 }
 
 /**
- * 시스템 프롬프트 생성.
- * 역할 + 제약 + 메모리를 하나의 프롬프트로 조합.
+ * Build system prompt.
+ * Combine role + constraints + memory into one system prompt.
  */
 export function buildSystemPrompt(
   context: ExecutionContext,
@@ -115,12 +115,12 @@ export function buildSystemPrompt(
 ): string {
   const parts: string[] = [];
 
-  // 역할 프롬프트 (파일에서 로드된 것)
+  // Role prompt (loaded from file)
   if (rolePrompt) {
     parts.push(rolePrompt);
   }
 
-  // 제약 조건
+  // Constraints
   if (context.identity.constraints.length > 0) {
     parts.push(
       "## Constraints\n" +
@@ -128,7 +128,7 @@ export function buildSystemPrompt(
     );
   }
 
-  // 이전 단계 컨텍스트 (있으면)
+  // Previous step context (if available)
   if (context.memory?.summary) {
     parts.push("## Previous Step Summary\n" + context.memory.summary);
   }

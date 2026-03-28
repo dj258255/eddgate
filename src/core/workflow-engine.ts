@@ -52,7 +52,7 @@ export async function executeWorkflow(
   const orderedSteps = topologicalSort(workflow.steps);
 
   if (workflow.config.topology === "parallel") {
-    // parallel: 의존성 없는 단계들을 동시 실행
+    // parallel: run independent steps concurrently
     const layers = buildParallelLayers(orderedSteps);
 
     for (const layer of layers) {
@@ -96,13 +96,13 @@ export async function executeWorkflow(
       }
     }
   } else {
-    // pipeline / single: 순차 실행
+    // pipeline / single: sequential execution
     for (const step of orderedSteps) {
       if (hasDependencyFailure(step, results)) {
         const skipped = createSkippedResult(step.id);
         results.set(step.id, skipped);
         stepResults.push(skipped);
-        tracer.error(step.id, "의존성 단계 실패로 스킵");
+        tracer.error(step.id, "Dependency failed -- skipping");
         continue;
       }
 
@@ -182,7 +182,7 @@ async function executeStep(
   tracer.stepStart(step.id, context);
 
   try {
-    // human_approval: 사람 승인 대기
+    // human_approval: wait for human approve/deny
     if (step.type === "human_approval") {
       const stepInput = getStepInput(step, originalInput, previousResults);
       console.log("\n--- Human Approval Required ---");
@@ -205,7 +205,7 @@ async function executeStep(
       };
     }
 
-    // record_decision: 실행 결과를 파일로 기록 (감사 추적)
+    // record_decision: log execution result for audit trail
     if (step.type === "record_decision") {
       const stepInput = getStepInput(step, originalInput, previousResults);
       const durationMs = Math.round(performance.now() - stepStart);
@@ -247,7 +247,7 @@ async function executeStep(
       };
     }
 
-    // 에이전트 실행
+    // Agent execution
     const stepInput = getStepInput(step, originalInput, previousResults);
     const agentOutput = await runAgent({
       stepId: step.id,

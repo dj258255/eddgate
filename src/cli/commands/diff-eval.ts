@@ -1,3 +1,4 @@
+import { loadAllTraces } from "../../trace/trace-loader.js";
 import { readFile, readdir } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -117,24 +118,6 @@ function getChangedFiles(before: string, after: string): string[] {
   }
 }
 
-async function loadAllTraces(dir: string): Promise<TraceEvent[]> {
-  const files = await readdir(dir).catch(() => []);
-  const events: TraceEvent[] = [];
-
-  for (const file of files) {
-    if (!file.endsWith(".jsonl")) continue;
-    const content = await readFile(join(dir, file), "utf-8");
-    for (const line of content.split("\n").filter(Boolean)) {
-      try {
-        events.push(JSON.parse(line) as TraceEvent);
-      } catch {
-        // skip invalid lines
-      }
-    }
-  }
-
-  return events;
-}
 
 function extractEvalScores(events: TraceEvent[]): StepScore[] {
   const scores: StepScore[] = [];

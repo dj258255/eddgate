@@ -1,6 +1,6 @@
 // ─── Execution Context ───────────────────────────────────────
-// 최소 실행 컨텍스트. 재현 가능성이 핵심.
-// "100토큰 요약 > 10,000토큰 raw" (Anthropic)
+// Minimal execution context. Reproducibility is key.
+// "100-token summary > 10,000-token raw" (Anthropic)
 
 export type StepState =
   | "classify"
@@ -29,7 +29,7 @@ export interface ExecutionContext {
   memory?: StepMemory;
 }
 
-// ─── Validation (Tier 1: 규칙 기반, 매 단계, 비용 0) ────────
+// ─── Validation (Tier 1: rule-based, every step, zero cost) ────────
 
 export type ValidationRuleType =
   | "schema"
@@ -53,7 +53,7 @@ export interface ValidationResult {
   }>;
 }
 
-// ─── Evaluation (Tier 2: LLM 평가, 핵심 전환점만) ────────────
+// ─── Evaluation (Tier 2: LLM judge, key transitions only) ────────────
 
 export type EvalType = "groundedness" | "relevance" | "custom";
 export type EvalAction = "block" | "flag" | "retry";
