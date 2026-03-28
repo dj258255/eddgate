@@ -205,6 +205,49 @@ Auto-detects backend:
 | api-design | 3 | Requirements, endpoints, docs |
 | translation | 3 | Analyze, translate, verify |
 
+## Evaluation Thresholds
+
+Default: **0.7** (industry standard for LLM-as-judge).
+
+| Score | Meaning |
+|-------|---------|
+| 0.7+ | Pass -- acceptable quality |
+| 0.8+ | Good -- bug-fix and translation use this |
+| 0.9+ | Unrealistic for most LLM tasks (judge agreement is ~80-85%) |
+| < 0.7 | Fail -- gate blocks, retry or stop |
+
+Configurable per step in workflow YAML. `eddgate analyze` suggests adjusted thresholds based on observed score ranges.
+
+## CI/CD Integration
+
+```yaml
+# .github/workflows/eddgate-loop.yml
+name: eddgate loop
+on:
+  push:
+    paths: ['templates/prompts/**', 'templates/workflows/**']
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci && npm run build
+
+      # Validate workflow graphs
+      - run: node dist/cli/index.js doctor --ci -w templates/workflows
+
+      # Check for regressions
+      - run: node dist/cli/index.js test diff -d traces
+
+      # Deployment gate
+      - run: node dist/cli/index.js advanced gate --results eval-results.json --rules templates/gate-rules.yaml
+```
+
+`test diff` exits 1 on regression. `gate` exits 1 on threshold failure. CI blocks the merge.
+
 ## License
 
 MIT

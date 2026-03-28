@@ -289,7 +289,7 @@ steps:
     evaluation:
       enabled: true
       type: "custom"
-      threshold: 1.0  # 모든 규칙 Pass 필수
+      threshold: 0.7  # industry standard (LLM judge agreement ~80-85%, 0.9+ is unreachable)
       onFail: "retry"  # patch 단계로 되돌리고 재실행
     context:
       state: "validate"
