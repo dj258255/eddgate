@@ -30,7 +30,7 @@ if (process.argv.length <= 2) {
 async function launchTUI(): Promise<void> {
   const p = await import("@clack/prompts");
 
-  p.intro(chalk.bold("eddgate"));
+  p.intro(chalk.yellow("<|>") + " " + chalk.bold("eddgate"));
 
   const mode = await p.select({
     message: "What do you want to do?",

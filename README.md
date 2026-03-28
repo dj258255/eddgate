@@ -1,6 +1,10 @@
-# eddgate
+<p align="center">
+  <img src="assets/logo.svg" width="80" height="80" alt="eddgate logo">
+</p>
 
-Self-improving evaluation loop for LLM workflows.
+<h1 align="center">eddgate</h1>
+
+<p align="center">Self-improving evaluation loop for LLM workflows.</p>
 
 Run workflows with validation gates, analyze failures, auto-generate rules, regression test. One CLI, one loop.
 

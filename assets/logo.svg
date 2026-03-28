@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="#0d1117" stroke="#30363d" stroke-width="2"/>
+
+  <!-- Loop arrow (the self-improving cycle) -->
+  <path d="M 40 58 C 40 38, 88 38, 88 58" stroke="#58a6ff" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M 88 70 C 88 90, 40 90, 40 70" stroke="#58a6ff" stroke-width="4" fill="none" stroke-linecap="round"/>
+
+  <!-- Arrow heads -->
+  <polygon points="88,52 96,58 88,64" fill="#58a6ff"/>
+  <polygon points="40,76 32,70 40,64" fill="#58a6ff"/>
+
+  <!-- Gate bars (validation gates) -->
+  <rect x="56" y="36" width="4" height="16" rx="2" fill="#3fb950"/>
+  <rect x="68" y="36" width="4" height="16" rx="2" fill="#3fb950"/>
+
+  <rect x="56" y="76" width="4" height="16" rx="2" fill="#3fb950"/>
+  <rect x="68" y="76" width="4" height="16" rx="2" fill="#3fb950"/>
+
+  <!-- Center dot (the eval checkpoint) -->
+  <circle cx="64" cy="64" r="6" fill="#d29922"/>
+</svg>

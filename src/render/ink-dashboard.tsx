@@ -82,6 +82,8 @@ function Dashboard({ workflowName, steps, tracer, model, effort }: DashboardProp
     <Box flexDirection="column" padding={1}>
       {/* Header */}
       <Box borderStyle="round" paddingX={2} paddingY={0} borderColor="cyan">
+        <Text bold color="yellow">{"<|>"}</Text>
+        <Text> </Text>
         <Text bold color="cyan">eddgate</Text>
         <Text> - </Text>
         <Text>{workflowName}</Text>
