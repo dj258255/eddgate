@@ -20,11 +20,11 @@
     stroke-linecap="round"
   />
 
-  <!-- Right arrow head (pointing straight down) -->
-  <polygon points="382,208 414,240 382,272" fill="#58a6ff"/>
+  <!-- Right arrow: points straight DOWN, at right end of top arc -->
+  <polygon points="366,220 398,220 382,256" fill="#58a6ff"/>
 
-  <!-- Left arrow head (pointing straight up) -->
-  <polygon points="130,304 98,272 130,240" fill="#58a6ff"/>
+  <!-- Left arrow: points straight UP, at left end of bottom arc -->
+  <polygon points="146,292 114,292 130,256" fill="#58a6ff"/>
 
   <!-- Gate bars top -->
   <rect x="228" y="108" width="16" height="72" rx="8" fill="#3fb950"/>
