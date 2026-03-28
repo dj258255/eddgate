@@ -108,11 +108,38 @@ export async function tuilauncher(): Promise<LaunchResult> {
   });
   if (p.isCancel(workflow)) { p.cancel(l.cancelled); return cancelled(); }
 
-  // Input
-  const input = await p.text({
-    message: l.input,
-    validate: (val) => (val?.trim() ? undefined : l.input),
+  // Input method
+  const inputMethod = await p.select({
+    message: lang === "ko" ? "입력 방식" : "Input method",
+    options: [
+      { value: "file", label: lang === "ko" ? "파일 선택" : "Select file" },
+      { value: "text", label: lang === "ko" ? "직접 입력" : "Type text" },
+    ],
   });
+  if (p.isCancel(inputMethod)) { p.cancel(l.cancelled); return cancelled(); }
+
+  let input: string | symbol;
+
+  if (inputMethod === "file") {
+    const files = await findInputFiles(".");
+    if (files.length === 0) {
+      p.log.warn(lang === "ko" ? "현재 디렉토리에 파일이 없습니다." : "No files found.");
+      input = await p.text({
+        message: l.input,
+        validate: (val) => (val?.trim() ? undefined : l.input),
+      });
+    } else {
+      input = await p.select({
+        message: lang === "ko" ? "파일을 선택하세요" : "Select a file",
+        options: files.map((f) => ({ value: f, label: f })),
+      }) as string;
+    }
+  } else {
+    input = await p.text({
+      message: l.input,
+      validate: (val) => (val?.trim() ? undefined : l.input),
+    });
+  }
   if (p.isCancel(input)) { p.cancel(l.cancelled); return cancelled(); }
 
   // Model
@@ -180,6 +207,23 @@ async function findWorkflows(dir: string): Promise<string[]> {
     return files
       .filter((f) => extname(f) === ".yaml" || extname(f) === ".yml")
       .map((f) => basename(f, extname(f)));
+  } catch {
+    return [];
+  }
+}
+
+async function findInputFiles(dir: string): Promise<string[]> {
+  try {
+    const { readdirSync, statSync } = await import("node:fs");
+    const entries = readdirSync(resolve(dir));
+    return entries
+      .filter((f) => {
+        if (f.startsWith(".") || f === "node_modules" || f === "dist") return false;
+        const ext = extname(f).toLowerCase();
+        return [".txt", ".md", ".json", ".csv", ".yaml", ".yml", ".ts", ".js", ".py"].includes(ext)
+          || statSync(resolve(dir, f)).isDirectory();
+      })
+      .slice(0, 20); // max 20 items
   } catch {
     return [];
   }
