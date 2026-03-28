@@ -387,7 +387,11 @@ async function handleMcp(): Promise<void> {
     return;
   }
 
-  if (action === "remove" && mcp.servers.length > 0) {
+  if (action === "remove") {
+    if (mcp.servers.length === 0) {
+      await blessedMessage(screen, t("mcp.noServers"), { label: "MCP", height: 5 });
+      return;
+    }
     const toRemove = await blessedSelect(screen, {
       message: t("mcp.remove"),
       items: mcp.servers.map((s) => ({ value: s.name as string, label: `${s.name} (${s.transport})` })),

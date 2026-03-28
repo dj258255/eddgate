@@ -125,8 +125,9 @@ export function blessedInput(
       resolve(null);
     });
 
-    input.focus();
     screen.render();
+    // readInput activates the text input mode (cursor visible, typing works)
+    input.readInput();
   });
 }
 
