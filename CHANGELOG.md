@@ -4,53 +4,88 @@
 
 Initial release. Self-improving evaluation loop for LLM workflows.
 
-### The Loop
+### Core Loop
 
 ```
 run -> analyze -> test -> run (improved)
 ```
 
-### Core Commands
+Three things combined that don't exist together anywhere else:
+1. Validation gates (EDDOps) -- deterministic checks between workflow steps
+2. Error analysis (Hamel Husain's approach) -- cluster failures, auto-generate rules
+3. Regression testing (Percy/Chromatic for agents) -- snapshot behavior, diff changes
+
+### Commands
+
+Core:
 - `run`: Execute workflow with Tier 1 (Zod) + Tier 2 (LLM) validation gates
-- `analyze`: Cluster failure patterns from traces, auto-generate rules, context profiler
+- `analyze`: Cluster failure patterns, auto-generate rules, context window profiler
 - `test`: Behavioral snapshots + regression diff with CI exit codes
+- `init`, `doctor`, `list`
 
-### Engine
-- Pipeline/parallel/single topology with topological sort
-- Deterministic Tier 1 validation (0% false positives, 5ms)
-- LLM evaluation at key transitions with score normalization (0-1)
-- Error recovery with exponential backoff (3 retries)
-- Cost budget control (--max-budget-usd)
-- Graph validator (cycle detection, dangling refs)
-- Context Engineering: retrieve steps isolated from execution context
-- record_decision step type for audit trail
-- Auto-load generated rules from eval/rules/ on next run
+Advanced:
+- `eval`, `diff-eval`, `gate`, `monitor`, `version-diff`, `mcp`, `viz`, `step`, `trace`
 
-### TUI
-- @clack/prompts for setup (workflow, model, effort selection)
-- Ink real-time dashboard during execution (steps + log panels)
+### TUI (Terminal UI)
+
+- @clack/prompts for all interactions (no raw CLI args needed)
+- Main menu: Run / Analyze / Test / MCP Servers / Settings
+- Model selection: Opus 4.6, Sonnet 4.6, Haiku 4.5, Opus 4.5, Sonnet 4.5
+- Effort levels: low / medium / high / max
+- Extended thinking: off / adaptive / enabled
 - File picker with folder navigation
 - Korean/English language selection
-- Mode selector: Run / Analyze / Test
+- Ink real-time dashboard during execution (steps + log panels)
+- MCP server manager (add/remove/list from TUI)
+- Settings manager (model, traces, Langfuse from TUI)
+
+### Engine
+
+- Pipeline/parallel/single topology with topological sort
+- Deterministic Tier 1 validation (Zod, 0% false positives, 5ms)
+- LLM evaluation at key transitions with score normalization (0-1)
+- Threshold: 0.7 default (industry standard, 0.9+ unreachable for LLM judges)
+- Error recovery: exponential backoff retry (3 attempts, no infinite recursion)
+- Cost budget control (--max-budget-usd)
+- Graph validator (cycle detection, dangling refs, duplicate IDs)
+- Context Engineering: retrieve steps isolated from execution context (code-enforced)
+- Auto-load generated rules from eval/rules/ on next run (loop closure)
+- record_decision step type for audit trail
 
 ### Adapters
-- Claude SDK (any subscription, no API key)
-- Anthropic API (ANTHROPIC_API_KEY)
-- LLM adapter interface for custom backends
+
+- LLM adapter interface for pluggable backends
+- Claude SDK adapter (any subscription, no API key needed)
+- Anthropic API adapter (ANTHROPIC_API_KEY)
+- Extended thinking support (disabled/adaptive/enabled)
 
 ### Templates
-- 5 workflows (document-pipeline, code-review, bug-fix, api-design, translation)
+
+- 5 workflows: document-pipeline, code-review, bug-fix, api-design, translation
 - 8 role definitions + prompts
 - gate-rules.yaml for deployment gates
 
 ### Output
-- stdout, JSONL trace, HTML report, TUI dashboard, JSON
+
+- stdout real-time log
+- JSONL structured traces
+- HTML report (dark mode, collapsible steps, score gauges)
+- TUI interactive dashboard (Ink)
+- JSON machine-readable output
 - Langfuse and OpenTelemetry adapters (optional)
 
 ### CI/CD
+
 - GitHub Actions: ci.yml (build/test), eval.yml (prompt change validation)
-- `eddgate test diff` exits 1 on regression
-- `eddgate advanced gate` with configurable rules
+- `test diff` exits 1 on regression
+- `gate` exits 1 on threshold failure
+
+### Docs
+
+- docs/en/ARCHITECTURE.md
+- docs/ko/README.md (Korean)
+- docs/ko/ARCHITECTURE.md (Korean)
 
 ### Tests
+
 - 63 tests passing (unit + integration)
