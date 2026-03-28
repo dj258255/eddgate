@@ -41,7 +41,6 @@
     "@anthropic-ai/claude-agent-sdk": "^0.2.86",
     "chalk": "^5.4.0",
     "commander": "^13.0.0",
-    "ora": "^8.2.0",
     "yaml": "^2.7.0",
     "zod": "^4.0.0"
   },
