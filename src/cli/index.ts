@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
-import chalk from "chalk";
 import { runCommand } from "./commands/run.js";
 import { listCommand } from "./commands/list.js";
 import { stepCommand } from "./commands/step.js";
@@ -17,336 +16,17 @@ import { gateCommand } from "./commands/gate.js";
 import { versionDiffCommand } from "./commands/version-diff.js";
 import { analyzeCommand } from "./commands/analyze.js";
 import { testCommand } from "./commands/test.js";
-import { tuilauncher } from "./tui-launcher.js";
-import { setEffort } from "../core/agent-runner.js";
 
 // No args = blessed TUI mode
 if (process.argv.length <= 2) {
-  import("./blessed-tui.js").then((m) => m.launchBlessedTUI()).catch(() => {
-    // Fallback to clack TUI if blessed fails
-    launchTUI();
-  });
+  import("./blessed-tui.js")
+    .then((m) => m.launchBlessedTUI())
+    .catch((err) => {
+      console.error("TUI failed to launch:", err.message);
+      process.exit(1);
+    });
 } else {
   launchCLI();
-}
-
-async function launchTUI(): Promise<void> {
-  const p = await import("@clack/prompts");
-  const { initLang, t } = await import("../i18n/index.js");
-
-  initLang();
-
-  p.intro(chalk.yellow("<|>") + " " + chalk.bold("eddgate"));
-
-  // Main loop -- Esc/cancel returns to menu, "exit" quits
-  while (true) {
-    const mode = await p.select({
-      message: t("menu.whatToDo"),
-      options: [
-        { value: "run", label: t("menu.run"), hint: t("menu.runHint") },
-        { value: "analyze", label: t("menu.analyze"), hint: t("menu.analyzeHint") },
-        { value: "test", label: t("menu.test"), hint: t("menu.testHint") },
-        { value: "mcp", label: t("menu.mcp"), hint: t("menu.mcpHint") },
-        { value: "config", label: t("menu.config"), hint: t("menu.configHint") },
-        { value: "exit", label: t("menu.exit") },
-      ],
-    });
-
-    if (p.isCancel(mode) || mode === "exit") {
-      p.outro(chalk.dim(t("menu.bye")));
-      process.exit(0);
-    }
-
-    if (mode === "analyze") {
-      const contextMode = await p.confirm({ message: t("analyze.contextMode") });
-      if (p.isCancel(contextMode)) continue;
-
-      const genRules = await p.confirm({ message: t("analyze.generateRules") });
-      if (p.isCancel(genRules)) continue;
-
-      await analyzeCommand({
-        dir: "./traces",
-        context: !!contextMode,
-        generateRules: !!genRules,
-        output: "./eval/rules",
-      });
-      continue; // back to menu after done
-    }
-
-    if (mode === "test") {
-      const action = await p.select({
-        message: t("test.action"),
-        options: [
-          { value: "snapshot", label: t("test.snapshot"), hint: t("test.snapshotHint") },
-          { value: "diff", label: t("test.diff"), hint: t("test.diffHint") },
-          { value: "list", label: t("test.listSnapshots") },
-          { value: "back", label: t("menu.back") },
-        ],
-      });
-      if (p.isCancel(action) || action === "back") continue;
-
-      await testCommand(action as string, { dir: "./traces" });
-      continue;
-    }
-
-    if (mode === "mcp") {
-      await tuiMcpManager(p);
-      continue;
-    }
-
-    if (mode === "config") {
-      await tuiConfigManager(p);
-      continue;
-    }
-
-  // mode === "run" -> launch workflow selector
-  const result = await tuilauncher();
-
-  if (result.cancelled) {
-    continue; // back to main menu
-  }
-
-  if (result.effort && result.effort !== "medium") {
-    setEffort(result.effort);
-  }
-
-  if (result.thinking && result.thinking !== "disabled") {
-    const { setThinking } = await import("../core/agent-runner.js");
-    setThinking(result.thinking);
-  }
-
-  await runCommand(result.workflow, {
-    input: result.input,
-    model: result.model,
-    config: "./eddgate.config.yaml",
-    workflowsDir: result.workflowsDir,
-    rolesDir: "./roles",
-    promptsDir: result.promptsDir,
-    report: result.report,
-    traceJsonl: result.traceJsonl,
-    maxBudgetUsd: result.maxBudgetUsd,
-    tui: true,
-    interactive: false,
-    quiet: false,
-    json: false,
-    dryRun: false,
-  });
-  } // end while
-}
-
-// ─── TUI: MCP Server Manager ────────────────────────────────
-
-async function tuiMcpManager(p: typeof import("@clack/prompts")): Promise<void> {
-  const { readFile, writeFile } = await import("node:fs/promises");
-  const { resolve } = await import("node:path");
-  const { parse: parseYaml, stringify: stringifyYaml } = await import("yaml");
-
-  const configPath = resolve("./eddgate.config.yaml");
-
-  let config: Record<string, unknown> = {};
-  try {
-    const raw = await readFile(configPath, "utf-8");
-    config = (parseYaml(raw) as Record<string, unknown>) ?? {};
-  } catch { /* no config */ }
-
-  const mcp = (config.mcp as { servers?: Array<Record<string, unknown>> }) ?? { servers: [] };
-  if (!mcp.servers) mcp.servers = [];
-
-  const action = await p.select({
-    message: "MCP servers",
-    options: [
-      { value: "list", label: `List servers (${mcp.servers.length})` },
-      { value: "add", label: "Add new server" },
-      { value: "remove", label: "Remove server" },
-      { value: "back", label: "Back" },
-    ],
-  });
-  if (p.isCancel(action) || action === "back") return;
-
-  if (action === "list") {
-    if (mcp.servers.length === 0) {
-      p.log.info("No MCP servers configured.");
-    } else {
-      for (const s of mcp.servers) {
-        p.log.info(`${s.name} (${s.transport}) -- ${s.command ?? s.url ?? ""}`);
-      }
-    }
-    return;
-  }
-
-  if (action === "add") {
-    const name = await p.text({ message: "Server name" });
-    if (p.isCancel(name)) return;
-
-    const transport = await p.select({
-      message: "Transport",
-      options: [
-        { value: "stdio", label: "stdio", hint: "local command" },
-        { value: "http", label: "http", hint: "remote URL" },
-        { value: "sse", label: "sse", hint: "server-sent events" },
-      ],
-    });
-    if (p.isCancel(transport)) return;
-
-    let target: string | symbol;
-    if (transport === "stdio") {
-      target = await p.text({ message: "Command (e.g., npx -y @pinecone-database/mcp)" });
-    } else {
-      target = await p.text({ message: "URL (e.g., https://mcp.example.com)" });
-    }
-    if (p.isCancel(target)) return;
-
-    const server: Record<string, unknown> = {
-      name: name as string,
-      transport: transport as string,
-    };
-    if (transport === "stdio") server.command = target as string;
-    else server.url = target as string;
-
-    mcp.servers.push(server);
-    config.mcp = mcp;
-    await writeFile(configPath, stringifyYaml(config), "utf-8");
-    p.log.success(`Added: ${name as string} (${transport as string})`);
-    return;
-  }
-
-  if (action === "remove") {
-    if (mcp.servers.length === 0) {
-      p.log.info("No servers to remove.");
-      return;
-    }
-
-    const toRemove = await p.select({
-      message: "Remove which server?",
-      options: mcp.servers.map((s) => ({
-        value: s.name as string,
-        label: `${s.name} (${s.transport})`,
-      })),
-    });
-    if (p.isCancel(toRemove)) return;
-
-    mcp.servers = mcp.servers.filter((s) => s.name !== toRemove);
-    config.mcp = mcp;
-    await writeFile(configPath, stringifyYaml(config), "utf-8");
-    p.log.success(`Removed: ${toRemove as string}`);
-  }
-}
-
-// ─── TUI: Config/Settings Manager ────────────────────────────
-
-async function tuiConfigManager(p: typeof import("@clack/prompts")): Promise<void> {
-  const { readFile, writeFile } = await import("node:fs/promises");
-  const { resolve } = await import("node:path");
-  const { parse: parseYaml, stringify: stringifyYaml } = await import("yaml");
-
-  const configPath = resolve("./eddgate.config.yaml");
-
-  let config: Record<string, unknown> = {};
-  try {
-    const raw = await readFile(configPath, "utf-8");
-    config = (parseYaml(raw) as Record<string, unknown>) ?? {};
-  } catch {
-    p.log.warn("No config file found. Run: eddgate init");
-    return;
-  }
-
-  const model = (config.model as Record<string, unknown>) ?? { default: "sonnet" };
-
-  const currentLang = (config.language as string) ?? "en";
-
-  const setting = await p.select({
-    message: "Settings",
-    options: [
-      { value: "model", label: `Default model: ${model.default ?? "sonnet"}` },
-      { value: "language", label: `Language: ${currentLang === "ko" ? "한국어" : "English"}` },
-      { value: "traces", label: "Trace output settings" },
-      { value: "view", label: "View current config" },
-      { value: "back", label: "Back" },
-    ],
-  });
-  if (p.isCancel(setting) || setting === "back") return;
-
-  if (setting === "model") {
-    const { MODELS: modelList } = await import("./models.js");
-    const newModel = await p.select({
-      message: "Default model",
-      options: modelList.map((m) => ({ value: m.value, label: m.label, hint: m.hint })),
-      initialValue: (model.default as string) ?? "sonnet",
-    });
-    if (p.isCancel(newModel)) return;
-
-    model.default = newModel as string;
-    config.model = model;
-    await writeFile(configPath, stringifyYaml(config), "utf-8");
-    p.log.success(`Default model set to: ${newModel as string}`);
-    return;
-  }
-
-  if (setting === "language") {
-    const newLang = await p.select({
-      message: "Language",
-      options: [
-        { value: "ko", label: "한국어" },
-        { value: "en", label: "English" },
-      ],
-      initialValue: currentLang,
-    });
-    if (p.isCancel(newLang)) return;
-
-    config.language = newLang as string;
-    await writeFile(configPath, stringifyYaml(config), "utf-8");
-    p.log.success(newLang === "ko" ? "언어가 한국어로 설정되었습니다." : "Language set to English.");
-    return;
-  }
-
-  if (setting === "traces") {
-    const traceAction = await p.select({
-      message: "Trace settings",
-      options: [
-        { value: "stdout", label: "Toggle stdout output" },
-        { value: "jsonl", label: "Set JSONL trace directory" },
-        { value: "langfuse", label: "Configure Langfuse" },
-      ],
-    });
-    if (p.isCancel(traceAction)) return;
-
-    if (traceAction === "jsonl") {
-      const dir = await p.text({ message: "JSONL traces directory", defaultValue: "./traces/" });
-      if (p.isCancel(dir)) return;
-
-      if (!config.trace) config.trace = { outputs: [] };
-      const trace = config.trace as { outputs: Array<Record<string, unknown>> };
-      // Remove existing jsonl, add new
-      trace.outputs = trace.outputs.filter((o) => o.type !== "jsonl");
-      trace.outputs.push({ type: "jsonl", config: { path: dir as string } });
-      await writeFile(configPath, stringifyYaml(config), "utf-8");
-      p.log.success(`JSONL traces: ${dir as string}`);
-    }
-
-    if (traceAction === "langfuse") {
-      const publicKey = await p.text({ message: "LANGFUSE_PUBLIC_KEY" });
-      if (p.isCancel(publicKey)) return;
-      const secretKey = await p.text({ message: "LANGFUSE_SECRET_KEY" });
-      if (p.isCancel(secretKey)) return;
-
-      if (!config.trace) config.trace = { outputs: [] };
-      const trace = config.trace as { outputs: Array<Record<string, unknown>> };
-      trace.outputs = trace.outputs.filter((o) => o.type !== "langfuse");
-      trace.outputs.push({
-        type: "langfuse",
-        config: { publicKey: publicKey as string, secretKey: secretKey as string },
-      });
-      await writeFile(configPath, stringifyYaml(config), "utf-8");
-      p.log.success("Langfuse configured.");
-    }
-
-    return;
-  }
-
-  if (setting === "view") {
-    const raw = await readFile(configPath, "utf-8");
-    p.log.info(raw);
-  }
 }
 
 function launchCLI(): void {
@@ -357,6 +37,7 @@ function launchCLI(): void {
     .description("Evaluation-gated workflow engine. Run without arguments for TUI mode.")
     .version("0.1.0");
 
+  // Core
   program
     .command("init")
     .description("Create a new eddgate project")
@@ -383,9 +64,7 @@ function launchCLI(): void {
     .option("-o, --output <path>", "Save result to file")
     .option("--report <path>", "Generate HTML report")
     .option("--trace-jsonl <path>", "Save JSONL trace")
-    .option("--tui", "Interactive TUI dashboard after completion")
     .option("--max-budget-usd <n>", "Cost limit in USD", parseFloat)
-    .option("--interactive", "Interactive setup before running")
     .option("--quiet", "Errors only")
     .option("--json", "JSON output")
     .option("--dry-run", "Preview without executing")

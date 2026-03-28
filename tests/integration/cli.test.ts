@@ -86,7 +86,6 @@ describe("CLI Core Commands", () => {
     expect(out).toContain("--quiet");
     expect(out).toContain("--json");
     expect(out).toContain("--report");
-    expect(out).toContain("--tui");
   });
 });
 

@@ -6,7 +6,6 @@ import {
   loadProjectConfig,
   loadPrompt,
 } from "../../config/loader.js";
-import { interactiveSetup } from "../interactive-setup.js";
 import { executeWorkflow } from "../../core/workflow-engine.js";
 import { setEffort } from "../../core/agent-runner.js";
 import { loadAutoRules } from "../../eval/rule-loader.js";
@@ -16,7 +15,6 @@ import {
   createJsonlListener,
 } from "../../trace/emitter.js";
 import { renderHTMLReport } from "../../render/html-report.js";
-import { renderTUI } from "../../render/tui-report.js";
 import type { WorkflowResult } from "../../types/index.js";
 
 interface RunOptions {
@@ -29,11 +27,8 @@ interface RunOptions {
   promptsDir: string;
   output?: string;
   report?: string;
-  tui?: boolean;
   traceJsonl?: string;
   maxBudgetUsd?: number;
-  interactive?: boolean;
-  verbose?: boolean;
   quiet?: boolean;
   json?: boolean;
   dryRun?: boolean;
@@ -52,28 +47,11 @@ export async function runCommand(
     console.log(chalk.dim(`워크플로우 로드: ${workflowPath}`));
     const workflow = await loadWorkflow(workflowPath);
 
-    // Interactive setup
-    if (options.interactive && !options.dryRun) {
-      const setup = await interactiveSetup(
-        workflow.name,
-        workflow.steps.length,
-      );
-      if (!setup.confirmed) {
-        console.log(chalk.dim("\nCancelled."));
-        return;
-      }
-      workflow.config.defaultModel = setup.model;
-      if (setup.effort && setup.effort !== "medium") setEffort(setup.effort);
-      if (setup.maxBudgetUsd) options.maxBudgetUsd = setup.maxBudgetUsd;
-      if (setup.outputReport) options.report = setup.outputReport;
-      if (setup.traceJsonl) options.traceJsonl = setup.traceJsonl;
-    }
-
-    // CLI --model/--effort 오버라이드 (interactive보다 우선)
-    if (options.model && !options.interactive) {
+    // CLI --model/--effort override
+    if (options.model) {
       workflow.config.defaultModel = options.model;
     }
-    if (options.effort && !options.interactive) {
+    if (options.effort) {
       setEffort(options.effort);
     }
 
@@ -146,29 +124,9 @@ export async function runCommand(
       }
     }
 
-    // 트레이서 설정
+    // 트레이서 설정 (CLI mode uses stdout, blessed TUI handles its own)
     const tracer = new TraceEmitter();
-    let inkCleanup: (() => void) | null = null;
-
-    const useDashboard = !options.quiet && !options.json && !options.dryRun && process.stdout.isTTY;
-
-    if (useDashboard) {
-      try {
-        const { renderInkDashboard } = await import("../../render/ink-dashboard.js");
-        const stepIds = workflow.steps.map((s) => s.id);
-        const { unmount } = renderInkDashboard(
-          workflow.name,
-          stepIds,
-          tracer,
-          workflow.config.defaultModel,
-          options.effort ?? "medium",
-        );
-        inkCleanup = unmount;
-      } catch {
-        // Ink not available, fallback to stdout
-        tracer.onEvent(createStdoutListener());
-      }
-    } else if (!options.quiet && !options.json) {
+    if (!options.quiet && !options.json) {
       tracer.onEvent(createStdoutListener());
     }
 
@@ -198,8 +156,8 @@ export async function runCommand(
       }
     }
 
-    // 실행 (Ink 대시보드 사용 시 헤더 생략)
-    if (!useDashboard && !options.quiet && !options.json) {
+    // 실행
+    if (!options.quiet && !options.json) {
       console.log(
         chalk.bold(`\n${workflow.name}`),
         chalk.dim(`(${workflow.steps.length} steps, ${workflow.config.topology})`),
@@ -218,13 +176,6 @@ export async function runCommand(
       tracer,
       maxBudgetUsd: options.maxBudgetUsd,
     });
-
-    // Ink 대시보드 정리
-    if (inkCleanup) {
-      // 잠시 대기 후 unmount (마지막 이벤트 렌더링 완료 대기)
-      await new Promise((r) => setTimeout(r, 500));
-      inkCleanup();
-    }
 
     // 결과 출력
     if (options.json) {
@@ -256,10 +207,6 @@ export async function runCommand(
       console.log(chalk.dim(`\n리포트 저장: ${options.report}`));
     }
 
-    // TUI 대시보드
-    if (options.tui) {
-      await renderTUI(result);
-    }
 
     // 실패 시 exit code 1
     if (result.status === "failed") {
