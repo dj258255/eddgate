@@ -199,7 +199,7 @@ export async function runCommand(
 }
 
 function printWorkflowStructure(workflow: { name: string; description: string; config: { defaultModel: string; topology: string; onValidationFail: string }; steps: Array<{ id: string; name: string; type: string; dependsOn?: string[]; validation?: { rules: unknown[] }; evaluation?: { enabled: boolean; type: string } }> }): void {
-  console.log(chalk.bold(`\n📋 ${workflow.name}`));
+  console.log(chalk.bold(`\n${workflow.name}`));
   console.log(chalk.dim(workflow.description));
   console.log(chalk.dim(`  모델: ${workflow.config.defaultModel}`));
   console.log(chalk.dim(`  토폴로지: ${workflow.config.topology}`));

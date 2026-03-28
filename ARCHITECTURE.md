@@ -73,14 +73,14 @@ interface ExecutionContext {
 ```
 
 **하지 않는 것**:
-- ❌ 범용 메모리 계층 (hot/cold/archival) — MemGPT/Letta가 실패한 이유
-- ❌ 자동 컨텍스트 요약 — JetBrains: LLM 요약이 관찰 마스킹보다 4/5에서 패배
-- ❌ 전체 대화 히스토리 주입 — context rot 유발
+- [no] 범용 메모리 계층 (hot/cold/archival) — MemGPT/Letta가 실패한 이유
+- [no] 자동 컨텍스트 요약 — JetBrains: LLM 요약이 관찰 마스킹보다 4/5에서 패배
+- [no] 전체 대화 히스토리 주입 — context rot 유발
 
 **하는 것**:
-- ✅ 실행 컨텍스트를 코드로 고정 (재현 가능)
-- ✅ 각 단계에 필요한 최소 정보만 전달
-- ✅ 이전 단계 결과는 필요할 때만 명시적으로 주입
+- [done] 실행 컨텍스트를 코드로 고정 (재현 가능)
+- [done] 각 단계에 필요한 최소 정보만 전달
+- [done] 이전 단계 결과는 필요할 때만 명시적으로 주입
 
 ---
 
@@ -574,8 +574,8 @@ project/
 │  Agent Runner → 에이전트 실행       │
 │  Tier 1 검증 → 스키마/필수필드      │
 │  Trace Emitter → 이벤트 기록       │
-│  ✅ Pass → 다음 단계               │
-│  ❌ Fail → 차단, 에러 출력          │
+│  [done] Pass → 다음 단계               │
+│  [no] Fail → 차단, 에러 출력          │
 └────────────────────────────────────┘
     │
     ▼
@@ -588,7 +588,7 @@ project/
     ▼
 ┌─ Step 3-1~3: generate (3 sub-step) ┐
 │  3-3 완료 시:                       │
-│  ★ Tier 2 LLM 평가 (groundedness)  │
+│  Tier 2 LLM 평가 (groundedness)  │
 │  → 0.7 이상: 통과                   │
 │  → 미만: flag 또는 retry            │
 └────────────────────────────────────┘
@@ -605,7 +605,7 @@ project/
     │
     ▼
 ┌─ Step 6: validate_final ───────────┐
-│  ★ Tier 2 LLM 평가 (전체 검증)     │
+│  Tier 2 LLM 평가 (전체 검증)     │
 │  → 모든 규칙 Pass: 완료             │
 │  → Fail 있음: Step 5로 되돌림       │
 │  → maxRetries 초과: 사람에게 넘김    │
@@ -822,43 +822,43 @@ eddgate/
 
 **Phase 1 (완료)**: CLI 코어 + 실행 검증
 
-1. ✅ Config Store — YAML 로드, Zod v4 검증
-2. ✅ Context Builder — 최소 실행 컨텍스트 생성
-3. ✅ Workflow Engine — pipeline/parallel/single 토폴로지
-4. ✅ Agent Runner — Claude Agent SDK (Max 구독, API 키 불필요)
-5. ✅ Eval Tier 1 — 규칙 기반 검증 (Zod, 오탐 0%)
-6. ✅ Eval Tier 2 — LLM 평가 (핵심 전환점, score 0~1 정규화)
-7. ✅ Trace (stdout + JSONL) — 구조화 로깅
-8. ✅ HTML 리포트 생성 (다크모드, 접기/펼치기)
-9. ✅ TUI 대시보드 (readline, 화살표 키 이동)
-10. ✅ CLI 커맨드: run, list, step, trace, eval
-11. ✅ human_approval 단계 타입
-12. ✅ 워크플로우 템플릿 3종 (document-pipeline, code-review, bug-fix)
-13. ✅ 역할 프롬프트 8개
-14. ✅ 유닛 테스트 41개 통과
-15. ✅ 8단계 파이프라인 실행 성공 (627s, 37K tokens, Max 구독)
-16. ✅ npm 패키지 준비
+1. [done] Config Store — YAML 로드, Zod v4 검증
+2. [done] Context Builder — 최소 실행 컨텍스트 생성
+3. [done] Workflow Engine — pipeline/parallel/single 토폴로지
+4. [done] Agent Runner — Claude Agent SDK (Max 구독, API 키 불필요)
+5. [done] Eval Tier 1 — 규칙 기반 검증 (Zod, 오탐 0%)
+6. [done] Eval Tier 2 — LLM 평가 (핵심 전환점, score 0~1 정규화)
+7. [done] Trace (stdout + JSONL) — 구조화 로깅
+8. [done] HTML 리포트 생성 (다크모드, 접기/펼치기)
+9. [done] TUI 대시보드 (readline, 화살표 키 이동)
+10. [done] CLI 커맨드: run, list, step, trace, eval
+11. [done] human_approval 단계 타입
+12. [done] 워크플로우 템플릿 3종 (document-pipeline, code-review, bug-fix)
+13. [done] 역할 프롬프트 8개
+14. [done] 유닛 테스트 41개 통과
+15. [done] 8단계 파이프라인 실행 성공 (627s, 37K tokens, Max 구독)
+16. [done] npm 패키지 준비
 
 **Phase 2 (완료)**: 고도화
 
-17. ✅ Langfuse/OTel 트레이스 어댑터 (선택적 의존성)
-18. ✅ Tier 3 오프라인 평가 + 회귀 감지
-19. ✅ diff-eval (프롬프트 변경 전후 비교)
-20. ✅ MCP 서버 관리 (mcp list/add/remove)
-21. ✅ 추가 워크플로우 템플릿 (api-design, translation)
-22. ✅ GitHub Actions CI/CD (ci.yml, eval.yml)
-23. ✅ 워크플로우 시각화 (Mermaid/ASCII)
+17. [done] Langfuse/OTel 트레이스 어댑터 (선택적 의존성)
+18. [done] Tier 3 오프라인 평가 + 회귀 감지
+19. [done] diff-eval (프롬프트 변경 전후 비교)
+20. [done] MCP 서버 관리 (mcp list/add/remove)
+21. [done] 추가 워크플로우 템플릿 (api-design, translation)
+22. [done] GitHub Actions CI/CD (ci.yml, eval.yml)
+23. [done] 워크플로우 시각화 (Mermaid/ASCII)
 
 **Phase 3 (완료)**: GenAIOps 파이프라인
 
-24. ✅ monitor 커맨드 (status/cost/quality 집계)
-25. ✅ gate 커맨드 (배포 게이트, 규칙 기반 pass/fail)
-26. ✅ version-diff (프롬프트/워크플로우 버전 비교)
-27. ✅ model-provider 실제 연결 (config overrides by step type)
-28. ✅ record_decision 단계 타입 (감사 추적)
-29. ✅ E2E Trace에 retrieval chunk ID/source 추적
-30. ✅ Context Engineering 강제: retrieve 단계 실행 컨텍스트 분리 (코드 강제)
-31. ✅ gate-rules.yaml 템플릿
+24. [done] monitor 커맨드 (status/cost/quality 집계)
+25. [done] gate 커맨드 (배포 게이트, 규칙 기반 pass/fail)
+26. [done] version-diff (프롬프트/워크플로우 버전 비교)
+27. [done] model-provider 실제 연결 (config overrides by step type)
+28. [done] record_decision 단계 타입 (감사 추적)
+29. [done] E2E Trace에 retrieval chunk ID/source 추적
+30. [done] Context Engineering 강제: retrieve 단계 실행 컨텍스트 분리 (코드 강제)
+31. [done] gate-rules.yaml 템플릿
 
 **미래 (선택)**:
 

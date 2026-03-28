@@ -110,7 +110,7 @@ steps:
           - "Reference 섹션은 Raw URL Only — URL 외 설명 금지"
           - "링크 정합성 완료 — 적합/중복 제거/인용 번호 일치"
       tools: []
-    # ★ 핵심 전환점: 검색→생성 합류. LLM 평가 활성화
+    #핵심 전환점: 검색→생성 합류. LLM 평가 활성화
     evaluation:
       enabled: true
       type: "groundedness"
@@ -182,7 +182,7 @@ steps:
           - "Pass/Fail + 결함 목록만 판정"
           - "필수 섹션 존재, Reference Raw URL Only, [n] 인용만 허용"
       tools: []
-    # ★ 핵심 전환점: 최종 산출물 검증
+    #핵심 전환점: 최종 산출물 검증
     evaluation:
       enabled: true
       type: "custom"
