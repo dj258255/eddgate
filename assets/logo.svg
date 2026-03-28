@@ -2,21 +2,26 @@
   <!-- Background circle -->
   <circle cx="64" cy="64" r="60" fill="#0d1117" stroke="#30363d" stroke-width="2"/>
 
-  <!-- Loop arrow (the self-improving cycle) -->
-  <path d="M 40 58 C 40 38, 88 38, 88 58" stroke="#58a6ff" stroke-width="4" fill="none" stroke-linecap="round"/>
-  <path d="M 88 70 C 88 90, 40 90, 40 70" stroke="#58a6ff" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <!-- Top arc (left to right) -->
+  <path d="M 38 56 C 38 36, 90 36, 90 56" stroke="#58a6ff" stroke-width="5" fill="none" stroke-linecap="round"/>
 
-  <!-- Arrow heads -->
-  <polygon points="88,52 96,58 88,64" fill="#58a6ff"/>
-  <polygon points="40,76 32,70 40,64" fill="#58a6ff"/>
+  <!-- Bottom arc (right to left) -->
+  <path d="M 90 72 C 90 92, 38 92, 38 72" stroke="#58a6ff" stroke-width="5" fill="none" stroke-linecap="round"/>
 
-  <!-- Gate bars (validation gates) -->
-  <rect x="56" y="36" width="4" height="16" rx="2" fill="#3fb950"/>
-  <rect x="68" y="36" width="4" height="16" rx="2" fill="#3fb950"/>
+  <!-- Right arrow head (end of top arc, pointing down-right) -->
+  <polygon points="86,50 94,58 86,66" fill="#58a6ff"/>
 
-  <rect x="56" y="76" width="4" height="16" rx="2" fill="#3fb950"/>
-  <rect x="68" y="76" width="4" height="16" rx="2" fill="#3fb950"/>
+  <!-- Left arrow head (end of bottom arc, pointing up-left) -->
+  <polygon points="42,62 34,70 42,78" fill="#58a6ff"/>
 
-  <!-- Center dot (the eval checkpoint) -->
-  <circle cx="64" cy="64" r="6" fill="#d29922"/>
+  <!-- Gate bars top -->
+  <rect x="57" y="34" width="4" height="18" rx="2" fill="#3fb950"/>
+  <rect x="67" y="34" width="4" height="18" rx="2" fill="#3fb950"/>
+
+  <!-- Gate bars bottom -->
+  <rect x="57" y="76" width="4" height="18" rx="2" fill="#3fb950"/>
+  <rect x="67" y="76" width="4" height="18" rx="2" fill="#3fb950"/>
+
+  <!-- Center eval checkpoint -->
+  <circle cx="64" cy="64" r="7" fill="#d29922"/>
 </svg>
