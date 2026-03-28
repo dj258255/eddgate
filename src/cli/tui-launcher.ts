@@ -2,6 +2,7 @@ import * as p from "@clack/prompts";
 import { readdir } from "node:fs/promises";
 import { resolve, extname, basename } from "node:path";
 import chalk from "chalk";
+import { pickFile } from "./file-picker.js";
 
 export interface LaunchResult {
   workflow: string;
@@ -121,19 +122,10 @@ export async function tuilauncher(): Promise<LaunchResult> {
   let input: string | symbol;
 
   if (inputMethod === "file") {
-    const files = await findInputFiles(".");
-    if (files.length === 0) {
-      p.log.warn(lang === "ko" ? "현재 디렉토리에 파일이 없습니다." : "No files found.");
-      input = await p.text({
-        message: l.input,
-        validate: (val) => (val?.trim() ? undefined : l.input),
-      });
-    } else {
-      input = await p.select({
-        message: lang === "ko" ? "파일을 선택하세요" : "Select a file",
-        options: files.map((f) => ({ value: f, label: f })),
-      }) as string;
-    }
+    const filePath = await pickFile(".", lang);
+    if (!filePath) { p.cancel(l.cancelled); return cancelled(); }
+    input = filePath;
+    p.log.info(`${lang === "ko" ? "선택됨" : "Selected"}: ${filePath}`);
   } else {
     input = await p.text({
       message: l.input,
@@ -212,19 +204,4 @@ async function findWorkflows(dir: string): Promise<string[]> {
   }
 }
 
-async function findInputFiles(dir: string): Promise<string[]> {
-  try {
-    const { readdirSync, statSync } = await import("node:fs");
-    const entries = readdirSync(resolve(dir));
-    return entries
-      .filter((f) => {
-        if (f.startsWith(".") || f === "node_modules" || f === "dist") return false;
-        const ext = extname(f).toLowerCase();
-        return [".txt", ".md", ".json", ".csv", ".yaml", ".yml", ".ts", ".js", ".py"].includes(ext)
-          || statSync(resolve(dir, f)).isDirectory();
-      })
-      .slice(0, 20); // max 20 items
-  } catch {
-    return [];
-  }
-}
+// findInputFiles removed -- replaced by file-picker.ts with folder navigation
