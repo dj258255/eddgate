@@ -1,69 +1,37 @@
 # Changelog
 
-## 0.2.0 (2026-03-28)
-
-GenAIOps pipeline complete. All 4 stages covered.
-
-### New Commands
-- `gate` -- deployment gate with configurable rules (avg_score, pass_rate thresholds)
-- `monitor` -- aggregated metrics from traces (status, cost by model/step, quality trends)
-- `version-diff` -- prompt/workflow change tracking between git commits
-
-### Engine
-- `record_decision` step type for audit trail logging
-- E2E trace with retrieval chunk ID/source metadata
-- Context Engineering enforced: retrieve steps cannot access execution context (code-enforced)
-- Model overrides from config now connected to workflow engine (classify=haiku, generate=sonnet)
-
-### Templates
-- gate-rules.yaml for deployment gate configuration
-
-### Tests
-- 60 tests passing (Context Engineering isolation test added)
-
 ## 0.1.0 (2026-03-28)
 
 Initial release.
 
-### Features
-
-- Workflow engine with pipeline/parallel/single topology
-- Tier 1 rule-based validation (Zod, deterministic, 0% false positives)
-- Tier 2 LLM evaluation at key transition points
-- Tier 3 offline batch evaluation with regression detection
-- Claude Agent SDK integration (Max subscription, no API key needed)
-- Context Builder with minimal execution context
-- Graph validator (cycle detection, dangling refs, duplicate IDs)
-- Error recovery with exponential backoff retry
+### Core
+- Workflow engine: pipeline/parallel/single topology
+- Tier 1 validation: Zod schema checks (deterministic, 0% false positives)
+- Tier 2 evaluation: LLM-as-judge at key transition points
+- Tier 3 offline: batch evaluation with regression detection
+- LLM adapter pattern: Claude SDK (any subscription) or Anthropic API
+- Context Engineering: retrieve steps isolated from execution context (code-enforced)
+- Graph validator: cycle detection, dangling refs, duplicate IDs
+- Error recovery: exponential backoff retry on transient failures
 - Cost budget control (--max-budget-usd)
-- human_approval step type
+- E2E trace with retrieval chunk metadata
+- record_decision step type for audit trail
 
-### CLI Commands
-
-- `eddgate init` -- scaffold project structure
-- `eddgate doctor` -- health check (Node, Claude CLI, config, graph)
-- `eddgate run` -- execute workflow (--report, --tui, --json, --quiet, --verbose)
-- `eddgate step` -- run single step for debugging
-- `eddgate trace` -- view saved traces
-- `eddgate eval` -- offline evaluation on saved traces
-- `eddgate list` -- list workflows and roles
+### Commands
+- Core: init, doctor, run, list
+- Advanced: step, trace, eval, diff-eval, gate, monitor, version-diff, mcp, viz
 
 ### Output
-
-- stdout real-time logging
-- JSONL structured traces
-- HTML report (dark mode, collapsible steps, score gauges)
-- TUI interactive dashboard
+- stdout, JSONL trace, HTML report (dark mode), TUI dashboard, JSON
+- Langfuse and OpenTelemetry adapters (optional)
 
 ### Templates
+- 5 workflows: document-pipeline, code-review, bug-fix, api-design, translation
+- 8 role definitions, 8 role prompts
+- gate-rules.yaml for deployment gates
 
-- document-pipeline (8 steps)
-- code-review (3 steps)
-- bug-fix (4 steps)
-- 8 role YAML definitions
-- 8 role prompt files
+### CI/CD
+- GitHub Actions: ci.yml (build/test), eval.yml (prompt change validation)
 
-### Trace Adapters
-
-- Langfuse (optional, requires langfuse package)
-- OpenTelemetry (optional, requires @opentelemetry/api)
+### Tests
+- 60 tests passing (unit + integration)

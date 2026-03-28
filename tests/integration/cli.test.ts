@@ -44,7 +44,7 @@ describe("CLI Core Commands", () => {
 
   it("shows version", () => {
     const out = run(["--version"]);
-    expect(out.trim()).toBe("0.2.0");
+    expect(out.trim()).toBe("0.1.0");
   });
 
   it("lists workflows", () => {

@@ -20,7 +20,7 @@ const program = new Command();
 program
   .name("eddgate")
   .description("Evaluation-gated workflow engine. Deterministic validation for LLM agents.")
-  .version("0.2.0");
+  .version("0.1.0");
 
 // ─── Core Commands (what users need to get started) ─────────
 
