@@ -1,48 +1,31 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
   <!--
     eddgate logo
-    Concept: "Circle with a gate notch"
-    - Circle = evaluation loop (run -> analyze -> test -> run)
-    - Notch/gap = the gate (validation checkpoint)
-    - Dot = the eval point
-    Describable: "a broken circle with a dot"
+    "Looping circle with gate and arrow"
+    - Arc with arrow = the loop keeps going (run -> analyze -> test -> run)
+    - Gate gap with bars = validation checkpoint
+    - Center dot = evaluation point
   -->
 
   <!-- Background -->
   <circle cx="256" cy="256" r="240" fill="#0d1117"/>
 
-  <!-- Main arc: thick broken circle with gate gap on the right -->
-  <!-- Top arc -->
+  <!-- Main loop arc (270 degrees, gap at top-right for the gate) -->
   <path
-    d="M 176 100 A 180 180 0 0 1 380 180"
+    d="M 340 108 A 170 170 0 1 1 172 108"
     stroke="#58a6ff"
-    stroke-width="36"
+    stroke-width="34"
     stroke-linecap="round"
     fill="none"
   />
 
-  <!-- Bottom arc -->
-  <path
-    d="M 380 332 A 180 180 0 0 1 176 412"
-    stroke="#58a6ff"
-    stroke-width="36"
-    stroke-linecap="round"
-    fill="none"
-  />
+  <!-- Arrow head at the end of arc (pointing right-downward, showing loop direction) -->
+  <polygon points="345,82 372,112 340,128" fill="#58a6ff"/>
 
-  <!-- Left connecting arc -->
-  <path
-    d="M 176 412 A 180 180 0 0 1 176 100"
-    stroke="#58a6ff"
-    stroke-width="36"
-    stroke-linecap="round"
-    fill="none"
-  />
-
-  <!-- Gate bars in the gap (right side) -->
-  <rect x="374" y="200" width="12" height="48" rx="6" fill="#3fb950"/>
-  <rect x="374" y="264" width="12" height="48" rx="6" fill="#3fb950"/>
+  <!-- Gate bars in the gap (top, between arrow and arc start) -->
+  <rect x="214" y="80" width="12" height="44" rx="6" fill="#3fb950"/>
+  <rect x="238" y="80" width="12" height="44" rx="6" fill="#3fb950"/>
 
   <!-- Center eval dot -->
-  <circle cx="256" cy="256" r="32" fill="#d29922"/>
+  <circle cx="256" cy="256" r="30" fill="#d29922"/>
 </svg>
