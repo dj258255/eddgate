@@ -6,7 +6,7 @@
 
 <p align="center">Self-improving evaluation loop for LLM workflows.</p>
 
-Run workflows with validation gates, analyze failures, auto-generate rules, regression test. One CLI, one loop.
+<p align="center">Full-screen terminal UI. Run workflows, analyze failures, auto-generate rules, regression test. One tool, one loop.</p>
 
 > **Coming from Promptfoo?** eddgate closes the loop that Promptfoo left open: failures are analyzed, rules are auto-generated, and applied on the next run. No data sent to any AI provider. Fully self-hosted.
 
@@ -25,10 +25,34 @@ Requirements: Node.js 20+, Claude CLI (any subscription) or ANTHROPIC_API_KEY
 ## Quick Start
 
 ```bash
-eddgate          # TUI mode -- select Run / Analyze / Test from menu
+eddgate
 ```
 
-Or with commands:
+That's it. A full-screen terminal UI launches. Select Run, Analyze, or Test from the menu.
+
+```
++---------------------------+----------------------------------------------------+
+|  eddgate                  |                                                    |
++---------------------------+                                                    |
+|                           |                                                    |
+|  > Run                    |   Select a workflow, model, effort level,           |
+|    Analyze                |   and input -- then watch it execute live.          |
+|    Test                   |                                                    |
+|    MCP                    |   Step progress on the left.                       |
+|    Plugins                |   Streaming log on the right.                      |
+|    Settings               |   Tokens, cost, elapsed time in the header.        |
+|    Exit                   |                                                    |
+|                           |                                                    |
++---------------------------+----------------------------------------------------+
+|  Arrow keys: navigate  |  Enter: select  |  Esc: back  |  q: quit            |
++------------------------------------------------------------------------+
+```
+
+Everything happens inside the TUI: workflow execution with live dashboard, failure analysis, regression testing, MCP server management, plugin import, language switching.
+
+### CLI mode (for CI/automation)
+
+All TUI actions are also available as CLI commands for scripting and CI pipelines:
 
 ```bash
 eddgate init                          # scaffold project
@@ -42,22 +66,22 @@ eddgate test diff -d traces           # detect regressions
 ## The Loop
 
 ```
-1. eddgate run          Execute workflow with validation gates
-        |
-2. eddgate analyze      Find failure patterns, auto-generate rules
-        |
-3. eddgate run          Run again -- generated rules auto-applied
-        |
-4. eddgate test snapshot    Save current behavior as baseline
-        |
+1. Run            Execute workflow with validation gates
+      |
+2. Analyze        Find failure patterns, auto-generate rules
+      |
+3. Run            Run again -- generated rules auto-applied
+      |
+4. Test snapshot  Save current behavior as baseline
+      |
    (modify prompts/workflows)
-        |
-5. eddgate test diff    Compare against baseline, catch regressions
-        |
+      |
+5. Test diff      Compare against baseline, catch regressions
+      |
    ... repeat
 ```
 
-No other tool does this. Promptfoo evaluates. Braintrust monitors. LangWatch traces. None of them close the loop from failure analysis back to execution improvement in one CLI.
+No other tool does this. Promptfoo evaluates. Braintrust monitors. LangWatch traces. None of them close the loop from failure analysis back to execution improvement.
 
 ## Validation Gates
 
@@ -142,18 +166,89 @@ eddgate analyze -d traces --context
     Reduce retries for "validate_final" or lower eval threshold
 ```
 
-## Commands
+## TUI
 
-```bash
-eddgate                    # TUI: Run / Analyze / Test
-eddgate run <workflow>     # execute with gates
-eddgate analyze            # failure patterns + rule generation
-eddgate test <action>      # snapshot / diff / list
-eddgate init               # scaffold project
-eddgate doctor             # health check
-eddgate list <type>        # workflows / roles
-eddgate advanced ...       # eval, gate, monitor, viz, mcp, etc.
+Run `eddgate` for the full-screen terminal UI. Everything is accessible from menus -- no commands to memorize.
+
+| Menu | What it does |
+|------|-------------|
+| **Run** | Select workflow, model, effort, thinking mode, input file/text. Live dashboard shows step progress (left panel) + streaming log (right panel). Header tracks elapsed time, tokens, cost. |
+| **Analyze** | Choose context profiler or failure analysis. Results displayed in-screen with split view. |
+| **Test** | Snapshot current behavior, diff against baseline, or list saved snapshots. |
+| **MCP** | Add/remove/list MCP servers without editing YAML. |
+| **Plugins** | View installed workflows, roles, Claude Code plugins. Import from file browser. |
+| **Settings** | Change default model, language (Korean/English), trace config. |
+
+Keyboard: Arrow keys navigate, Enter selects, Esc goes back, q quits, Tab switches panels.
+
+### Run dashboard
+
+During workflow execution, the TUI shows a live orchestration dashboard:
+
 ```
++---------------------------+----------------------------------------------------+
+|  document-pipeline        |  Workflow: document-pipeline                        |
+|  sonnet | high | 42s      |  Model: sonnet  Effort: high                       |
++---------------------------+  Elapsed: 42s  Tokens: 12,450  Cost: $0.02         |
+|                           +----------------------------------------------------+
+|  [done] classify_input    |  [STEP START] classify_input -> classifier          |
+|  [done] retrieve_docs     |  [VALIDATION] pass                                 |
+|  [run]  generate_draft    |  [STEP END] done 3.2s (2,100 tokens)               |
+|  [ .. ] validate_final    |  [STEP START] retrieve_docs -> researcher           |
+|  [ .. ] format_output     |  [RETRIEVAL] 3 chunks (avg score: 0.82)            |
+|                           |  [STEP END] done 5.1s (4,350 tokens)               |
+|                           |  [STEP START] generate_draft -> writer              |
+|                           |  ...                                                |
++---------------------------+----------------------------------------------------+
+```
+
+## CLI Commands (for CI/automation)
+
+All TUI actions are also available as commands for scripting and CI pipelines.
+
+### Core
+
+| Command | What it does |
+|---------|-------------|
+| `eddgate run <workflow>` | Execute a workflow with validation gates. Fails fast on bad output. |
+| `eddgate analyze` | Cluster failure patterns, suggest fixes. `--generate-rules` creates YAML rules. `--context` shows token usage. |
+| `eddgate test snapshot` | Save current behavioral baseline from traces. |
+| `eddgate test diff` | Compare against baseline. Exits 1 on regression (CI-friendly). |
+| `eddgate test list` | Show saved snapshots. |
+| `eddgate init` | Create project structure. |
+| `eddgate doctor` | Check Node.js, Claude CLI, config validity, graph integrity. |
+| `eddgate list workflows` | List available workflow YAML files. |
+| `eddgate list roles` | List available role definitions. |
+
+### Run flags
+
+| Flag | What it does |
+|------|-------------|
+| `-i, --input <file>` | Input file or text. If file, contents are read. |
+| `-m, --model <model>` | Override model: `sonnet`, `opus`, `haiku`, `claude-opus-4-5`, `claude-sonnet-4-5` |
+| `-e, --effort <level>` | Effort: `low`, `medium`, `high`, `max` |
+| `--report <path>` | Generate HTML report (dark mode, collapsible steps, score gauges). |
+| `--trace-jsonl <path>` | Save structured JSONL trace for later analysis. |
+| `--max-budget-usd <n>` | Stop workflow if accumulated cost exceeds this amount. |
+| `--dry-run` | Preview workflow structure without executing. |
+| `--json` | Machine-readable JSON output. |
+| `--quiet` | Errors only. |
+
+### Advanced
+
+| Command | What it does |
+|---------|-------------|
+| `eddgate advanced eval <workflow>` | Re-score saved traces using LLM judge. |
+| `eddgate advanced diff-eval <workflow>` | Compare eval scores between git commits. |
+| `eddgate advanced gate` | Deployment gate. Exits 1 if thresholds not met. |
+| `eddgate advanced monitor status` | Success rate, p50/p95 latency, tokens, cost. |
+| `eddgate advanced monitor cost` | Cost breakdown by model and step. |
+| `eddgate advanced monitor quality` | Eval score trends over time. |
+| `eddgate advanced viz <workflow>` | Mermaid diagram or ASCII visualization. |
+| `eddgate advanced step <workflow> <step-id>` | Run a single step in isolation. |
+| `eddgate advanced trace <file>` | View JSONL trace with timeline. |
+| `eddgate advanced mcp <action>` | Manage MCP servers: `list`, `add`, `remove`. |
+| `eddgate advanced version-diff` | Prompt/workflow changes between git commits. |
 
 ## Workflow Definition
 
