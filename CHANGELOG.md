@@ -1,37 +1,56 @@
 # Changelog
 
-## 0.1.0 (2026-03-28)
+## 0.1.0 (2026-03-29)
 
-Initial release.
+Initial release. Self-improving evaluation loop for LLM workflows.
 
-### Core
-- Workflow engine: pipeline/parallel/single topology
-- Tier 1 validation: Zod schema checks (deterministic, 0% false positives)
-- Tier 2 evaluation: LLM-as-judge at key transition points
-- Tier 3 offline: batch evaluation with regression detection
-- LLM adapter pattern: Claude SDK (any subscription) or Anthropic API
-- Context Engineering: retrieve steps isolated from execution context (code-enforced)
-- Graph validator: cycle detection, dangling refs, duplicate IDs
-- Error recovery: exponential backoff retry on transient failures
+### The Loop
+
+```
+run -> analyze -> test -> run (improved)
+```
+
+### Core Commands
+- `run`: Execute workflow with Tier 1 (Zod) + Tier 2 (LLM) validation gates
+- `analyze`: Cluster failure patterns from traces, auto-generate rules, context profiler
+- `test`: Behavioral snapshots + regression diff with CI exit codes
+
+### Engine
+- Pipeline/parallel/single topology with topological sort
+- Deterministic Tier 1 validation (0% false positives, 5ms)
+- LLM evaluation at key transitions with score normalization (0-1)
+- Error recovery with exponential backoff (3 retries)
 - Cost budget control (--max-budget-usd)
-- E2E trace with retrieval chunk metadata
+- Graph validator (cycle detection, dangling refs)
+- Context Engineering: retrieve steps isolated from execution context
 - record_decision step type for audit trail
+- Auto-load generated rules from eval/rules/ on next run
 
-### Commands
-- Core: init, doctor, run, list
-- Advanced: step, trace, eval, diff-eval, gate, monitor, version-diff, mcp, viz
+### TUI
+- @clack/prompts for setup (workflow, model, effort selection)
+- Ink real-time dashboard during execution (steps + log panels)
+- File picker with folder navigation
+- Korean/English language selection
+- Mode selector: Run / Analyze / Test
 
-### Output
-- stdout, JSONL trace, HTML report (dark mode), TUI dashboard, JSON
-- Langfuse and OpenTelemetry adapters (optional)
+### Adapters
+- Claude SDK (any subscription, no API key)
+- Anthropic API (ANTHROPIC_API_KEY)
+- LLM adapter interface for custom backends
 
 ### Templates
-- 5 workflows: document-pipeline, code-review, bug-fix, api-design, translation
-- 8 role definitions, 8 role prompts
+- 5 workflows (document-pipeline, code-review, bug-fix, api-design, translation)
+- 8 role definitions + prompts
 - gate-rules.yaml for deployment gates
+
+### Output
+- stdout, JSONL trace, HTML report, TUI dashboard, JSON
+- Langfuse and OpenTelemetry adapters (optional)
 
 ### CI/CD
 - GitHub Actions: ci.yml (build/test), eval.yml (prompt change validation)
+- `eddgate test diff` exits 1 on regression
+- `eddgate advanced gate` with configurable rules
 
 ### Tests
-- 60 tests passing (unit + integration)
+- 63 tests passing (unit + integration)

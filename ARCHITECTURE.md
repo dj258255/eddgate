@@ -1,21 +1,33 @@
-# eddgate CLI: 아키텍처 스펙
+# eddgate: Architecture
 
-> 버전: 0.1 (Draft)
-> 날짜: 2026-03-28
-> 기반: RESEARCH_ANALYSIS.md (시장 분석) + CRITICAL_ANALYSIS.md (현실 검증)
+> Version: 0.1.0
+> Date: 2026-03-29
 
 ---
 
-## 설계 원칙
+## What eddgate is
 
-CRITICAL_ANALYSIS.md에서 검증된 현실적 제약을 반영한 원칙:
+A self-improving evaluation loop for LLM workflows:
 
-1. **적을수록 낫다** — 100토큰 요약 > 10,000토큰 raw (Anthropic 자체 조언)
-2. **기본값은 Simple** — Single Agent가 기본. 복잡도는 사용자가 명시적으로 올림
-3. **평가는 경직되지 않게** — 매 단계 LLM 판사가 아닌 규칙 기반 + 핵심 전환점만 LLM
-4. **관측 플랫폼이 아닌 관측 가능한 프레임워크** — 자체 구축 안 함. 훅 + 통합
-5. **자동 마법 없음** — 적응형 토폴로지, 자동 교훈 학습 같은 검증 안 된 것은 배제
-6. **재현 가능성이 킬러 피처** — 같은 입력 → 같은 실행 경로
+```
+run -> analyze -> test -> run (improved) -> ...
+```
+
+Three things combined that don't exist together anywhere else:
+1. **Validation gates** (EDDOps) -- deterministic checks between workflow steps
+2. **Error analysis** (Hamel Husain's approach) -- cluster failures, auto-generate rules
+3. **Regression testing** (Percy/Chromatic for agents) -- snapshot behavior, diff changes
+
+---
+
+## Design Principles
+
+1. **Less is more** -- 100-token summary > 10,000-token raw (Anthropic)
+2. **Default simple** -- single agent, pipeline topology, add complexity only when needed
+3. **Gates not walls** -- rule-based checks every step, LLM eval only at key transitions
+4. **Observe don't platform** -- JSONL traces + Langfuse/OTel hooks, not a custom dashboard
+5. **Loop not line** -- failures feed back as rules for the next run
+6. **Reproducible** -- same input = same execution path
 
 ---
 

@@ -1,67 +1,67 @@
 # Contributing to eddgate
 
-## Development Setup
+## The Core Loop
+
+Everything in eddgate serves this loop:
+
+```
+run -> analyze -> test -> run (improved)
+```
+
+If a feature doesn't serve this loop, it probably doesn't belong here.
+
+## Development
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/dj258255/eddgate.git
 cd eddgate
 npm install
 npm run build
 npm test
 ```
 
-## Project Structure
+## Structure
 
 ```
 src/
-  cli/          CLI commands (Commander.js)
-  core/         Workflow engine, context builder, agent runner, graph validator
-  eval/         Tier 1 rules, Tier 2 LLM, Tier 3 offline
-  trace/        Trace emitter, replay, output adapters (Langfuse, OTel)
-  render/       HTML report, TUI dashboard
-  config/       YAML loader, Zod schemas
-  types/        TypeScript type definitions
+  cli/              Commands + TUI (clack, Ink)
+  core/             Workflow engine, context builder, agent runner, LLM adapter
+  eval/             Tier 1 rules, Tier 2 LLM eval, Tier 3 offline, rule loader
+  trace/            Emitter, replay, Langfuse/OTel adapters
+  render/           HTML report, Ink dashboard, TUI report
+  config/           YAML loader, Zod schemas
+  types/            TypeScript types
 
-templates/
-  workflows/    YAML workflow definitions
-  roles/        YAML role definitions
-  prompts/      Markdown role prompts
-
-tests/
-  unit/         Unit tests (vitest)
-  integration/  CLI integration tests
+templates/          Workflows, roles, prompts, gate rules
+tests/              Unit + integration
 ```
 
-## Running Tests
+## Tests
 
 ```bash
-npm test              # run all tests
+npm test              # all tests
 npm run test:watch    # watch mode
-npm run typecheck     # type check only
+npm run typecheck     # types only
 ```
 
-## Adding a Workflow Template
+## Adding a Workflow
 
-1. Create `templates/workflows/your-workflow.yaml`
-2. Define steps with validation rules and evaluation config
-3. Create role prompts in `templates/prompts/`
-4. Test with `eddgate run your-workflow --dry-run`
-5. Add integration test in `tests/integration/`
+1. Create `templates/workflows/name.yaml`
+2. Create role prompts in `templates/prompts/`
+3. Test: `eddgate run name --dry-run -w templates/workflows`
+4. Add integration test
 
 ## Adding a Validation Rule
 
-1. Add rule type to `src/eval/tier1-rules.ts`
+1. Add to `src/eval/tier1-rules.ts`
 2. Add type to `ValidationRuleType` in `src/types/index.ts`
-3. Add Zod schema in `src/config/schemas.ts`
-4. Add unit test in `tests/unit/tier1-rules.test.ts`
+3. Update Zod schema in `src/config/schemas.ts`
+4. Add test in `tests/unit/tier1-rules.test.ts`
 
-## Commit Messages
+## Commit Style
 
-Use clear, descriptive commit messages. No emoji.
+Clear descriptions. No emoji. No AI attribution.
 
 ## Code Style
 
-- TypeScript strict mode
-- ESM modules
-- No unnecessary abstractions
-- Test what matters
+TypeScript strict. ESM. Minimal abstractions. Test what matters.
