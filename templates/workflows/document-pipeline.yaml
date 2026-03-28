@@ -1,0 +1,208 @@
+name: "EDDOps 문서 파이프라인"
+description: "6단계 문서 처리 — 문제 구체화 → 링크 수집 → 답변 생성 → 구조 설계 → 패치 실행 → 최종 검증"
+
+config:
+  defaultModel: "sonnet"
+  topology: "pipeline"
+  onValidationFail: "block"
+
+steps:
+  # ── Step 1: 문제 구체화 ──────────────────────────────────
+  - id: "classify"
+    name: "문제 구체화"
+    type: "classify"
+    context:
+      state: "classify"
+      identity:
+        role: "problem_analyzer"
+        constraints:
+          - "핵심 문제/질문을 분석하고 답변 제목 형식으로 재구성"
+          - "각 이슈를 답변 섹션 제목 형태로 정리"
+      tools: []
+    validation:
+      rules:
+        - type: "required_fields"
+          spec:
+            fields: ["topics"]
+          message: "문제 항목 리스트(topics) 필수"
+        - type: "length"
+          spec:
+            min: 50
+          message: "분석 결과가 너무 짧음 (최소 50자)"
+
+  # ── Step 2: 링크 수집 ────────────────────────────────────
+  - id: "retrieve"
+    name: "문제별 관련 링크 수집"
+    type: "retrieve"
+    dependsOn: ["classify"]
+    context:
+      state: "retrieve"
+      identity:
+        role: "link_researcher"
+        constraints:
+          - "추정/창작 금지 — 확인된 링크만 제시"
+          - "URL은 반드시 http/https로 시작하는 Raw URL만 사용"
+          - "하이퍼링크/링크텍스트 금지"
+          - "공식 소스 우선"
+      tools: ["web_search"]
+    validation:
+      rules:
+        - type: "length"
+          spec:
+            min: 30
+          message: "링크 수집 결과가 비어있음"
+
+  # ── Step 3-1: Taxonomy Design ────────────────────────────
+  - id: "generate_taxonomy"
+    name: "Taxonomy Design + Classification"
+    type: "generate"
+    dependsOn: ["retrieve"]
+    context:
+      state: "generate"
+      identity:
+        role: "content_consolidator"
+        constraints:
+          - "문장 다듬기/맞춤법 교정 하지 않는다"
+          - "Developmental editing만 수행"
+          - "ISSUE_BRIEF와 REDUNDANCY_LOG 생성"
+          - "문제별 핵심 쟁점, 필요 정보, 초안 답변 재료 정리"
+      tools: []
+    validation:
+      rules:
+        - type: "length"
+          spec:
+            min: 100
+          message: "Taxonomy 결과가 너무 짧음"
+
+  # ── Step 3-2: Flow Editing ───────────────────────────────
+  - id: "generate_flow"
+    name: "Flow Editing (결론→근거→조건→액션)"
+    type: "generate"
+    dependsOn: ["generate_taxonomy"]
+    context:
+      state: "generate"
+      identity:
+        role: "flow_editor"
+        constraints:
+          - "새로운 사실 추가 금지"
+          - "링크 정합성/번호 부여 아직 하지 않는다"
+          - "결론→근거→조건/예외→다음 액션 순서로 재배열"
+          - "문장을 명료화하되 사실을 변경하지 않는다"
+      tools: []
+    validation:
+      rules:
+        - type: "length"
+          spec:
+            min: 100
+          message: "Flow Edit 결과가 너무 짧음"
+
+  # ── Step 3-3: Citation Editing ───────────────────────────
+  - id: "generate_citation"
+    name: "Citation Editing (인용 부여 + Reference)"
+    type: "generate"
+    dependsOn: ["generate_flow"]
+    context:
+      state: "generate"
+      identity:
+        role: "copy_citation_editor"
+        constraints:
+          - "본문에 링크를 직접 쓰지 말고 [n]만 사용"
+          - "Reference 섹션은 Raw URL Only — URL 외 설명 금지"
+          - "링크 정합성 완료 — 적합/중복 제거/인용 번호 일치"
+      tools: []
+    # ★ 핵심 전환점: 검색→생성 합류. LLM 평가 활성화
+    evaluation:
+      enabled: true
+      type: "groundedness"
+      threshold: 0.7
+      onFail: "flag"
+      maxRetries: 2
+    validation:
+      rules:
+        - type: "length"
+          spec:
+            min: 200
+          message: "Citation Edit 결과가 너무 짧음"
+
+  # ── Step 4: 구조 설계 ────────────────────────────────────
+  - id: "structure"
+    name: "문서 구조 설계 (IA/Outliner)"
+    type: "transform"
+    dependsOn: ["generate_citation"]
+    context:
+      state: "validate"
+      identity:
+        role: "information_architect"
+        constraints:
+          - "내용을 바꾸지 않고 문서 구조만 설계"
+          - "Outlining — H1 5~9개, 각 H1 아래 H2/H3"
+          - "Section Mapping — P#별 배치 이유"
+          - "문장 다듬기, 내용 추가, 링크 재선별 금지"
+      tools: []
+    validation:
+      rules:
+        - type: "length"
+          spec:
+            min: 100
+          message: "구조 설계 결과가 너무 짧음"
+
+  # ── Step 5: 패치 실행 + 문서 생성 ────────────────────────
+  - id: "patch"
+    name: "문서화 검증 및 생성 (Patch Executor)"
+    type: "generate"
+    dependsOn: ["structure"]
+    context:
+      state: "generate"
+      identity:
+        role: "patch_executor"
+        constraints:
+          - "VALIDATION_TABLE의 FAIL/AMBIG 행의 FixPlan을 그대로 실행"
+          - "DOC_SKELETON 구조를 따라 최종 문서 재조립"
+          - "FINAL_DRAFT 본문만으로 페이지 전체 교체 가능해야 함"
+          - "EDIT_LOG에 변경 사항 기록"
+      tools: []
+    validation:
+      rules:
+        - type: "length"
+          spec:
+            min: 100
+          message: "최종 문서가 너무 짧음"
+
+  # ── Step 6: 최종 검증 ────────────────────────────────────
+  - id: "validate_final"
+    name: "최종 검증 (Artifact Validator)"
+    type: "validate"
+    dependsOn: ["patch"]
+    context:
+      state: "validate"
+      identity:
+        role: "artifact_validator"
+        constraints:
+          - "내용 수정/재작성 금지"
+          - "Pass/Fail + 결함 목록만 판정"
+          - "필수 섹션 존재, Reference Raw URL Only, [n] 인용만 허용"
+      tools: []
+    # ★ 핵심 전환점: 최종 산출물 검증
+    evaluation:
+      enabled: true
+      type: "custom"
+      threshold: 0.9
+      onFail: "retry"
+      maxRetries: 2
+      rubric: |
+        다음 기준으로 문서 품질을 평가하세요:
+        1. 모든 필수 섹션이 존재하는가?
+        2. Reference 섹션이 Raw URL Only인가?
+        3. 본문의 [n] 인용 번호가 Reference와 일치하는가?
+        4. 각 섹션에 실질적 내용이 있는가 (빈 섹션 없음)?
+        5. 결론이 근거에 의해 뒷받침되는가?
+    validation:
+      rules:
+        - type: "custom"
+          spec:
+            check: "reference_consistency"
+          message: "[n] 인용 번호와 Reference 불일치"
+        - type: "custom"
+          spec:
+            check: "no_empty_sections"
+          message: "빈 섹션이 존재함"

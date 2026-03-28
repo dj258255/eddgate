@@ -1,0 +1,70 @@
+name: "코드 리뷰 파이프라인"
+description: "3단계 코드 리뷰 — 변경사항 분석 → 이슈 탐지 → 리뷰 리포트 생성"
+
+config:
+  defaultModel: "sonnet"
+  topology: "pipeline"
+  onValidationFail: "flag"
+
+steps:
+  - id: "analyze_diff"
+    name: "변경사항 분석"
+    type: "classify"
+    context:
+      state: "classify"
+      identity:
+        role: "diff_analyzer"
+        constraints:
+          - "변경된 파일 목록, 각 파일의 변경 유형(추가/수정/삭제), 영향 범위 분석"
+          - "변경 규모를 small/medium/large로 분류"
+          - "아키텍처 영향이 있는 변경인지 판별"
+      tools: ["file_read", "git"]
+    validation:
+      rules:
+        - type: "length"
+          spec: { min: 50 }
+          message: "분석 결과가 너무 짧음"
+
+  - id: "detect_issues"
+    name: "이슈 탐지"
+    type: "validate"
+    dependsOn: ["analyze_diff"]
+    context:
+      state: "validate"
+      identity:
+        role: "issue_detector"
+        constraints:
+          - "버그, 보안 취약점, 성능 문제, 코드 스타일 위반 탐지"
+          - "각 이슈에 severity(critical/high/medium/low) 부여"
+          - "오탐 줄이기 위해 확실한 이슈만 보고 — 의심만으로 보고하지 않음"
+          - "코드 컨텍스트를 충분히 확인한 후 판단"
+      tools: ["file_read"]
+    evaluation:
+      enabled: true
+      type: "relevance"
+      threshold: 0.7
+      onFail: "flag"
+    validation:
+      rules:
+        - type: "length"
+          spec: { min: 30 }
+          message: "이슈 탐지 결과가 비어있음"
+
+  - id: "generate_report"
+    name: "리뷰 리포트 생성"
+    type: "generate"
+    dependsOn: ["detect_issues"]
+    context:
+      state: "generate"
+      identity:
+        role: "review_reporter"
+        constraints:
+          - "이슈별로 파일 경로, 라인 번호, 설명, 수정 제안 포함"
+          - "요약 섹션에 전체 리뷰 결론 (approve/request_changes/comment)"
+          - "칭찬할 부분도 포함 — 좋은 패턴, 개선된 점"
+      tools: []
+    validation:
+      rules:
+        - type: "length"
+          spec: { min: 100 }
+          message: "리포트가 너무 짧음"

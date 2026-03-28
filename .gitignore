@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.env.local
+.env*.local
+traces/*.jsonl
+*.log
+.DS_Store
+.obsidian/
+.claude/
+test-input.txt
+test-output.md
+test-report.html
+firebase-debug.log

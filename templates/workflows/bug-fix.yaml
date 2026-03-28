@@ -1,0 +1,102 @@
+name: "버그 수정 파이프라인"
+description: "4단계 버그 수정 — 재현 확인 → 근본 원인 분석 → 수정 구현 → 검증"
+
+config:
+  defaultModel: "sonnet"
+  topology: "pipeline"
+  onValidationFail: "block"
+
+steps:
+  - id: "reproduce"
+    name: "버그 재현 확인"
+    type: "classify"
+    context:
+      state: "classify"
+      identity:
+        role: "bug_reproducer"
+        constraints:
+          - "버그 리포트에서 재현 단계 추출"
+          - "관련 파일/함수/라인 식별"
+          - "재현 가능 여부 판단 (reproducible/intermittent/cannot_reproduce)"
+      tools: ["file_read", "shell"]
+    validation:
+      rules:
+        - type: "length"
+          spec: { min: 50 }
+          message: "재현 분석이 너무 짧음"
+
+  - id: "root_cause"
+    name: "근본 원인 분석"
+    type: "generate"
+    dependsOn: ["reproduce"]
+    context:
+      state: "generate"
+      identity:
+        role: "root_cause_analyzer"
+        constraints:
+          - "증상이 아닌 근본 원인 식별"
+          - "관련 코드 경로 추적"
+          - "수정 시 영향 받는 다른 부분 파악"
+          - "가능한 수정 방법 2-3개 제안, 각각의 트레이드오프 설명"
+      tools: ["file_read"]
+    evaluation:
+      enabled: true
+      type: "groundedness"
+      threshold: 0.7
+      onFail: "flag"
+    validation:
+      rules:
+        - type: "length"
+          spec: { min: 100 }
+          message: "근본 원인 분석이 너무 짧음"
+
+  - id: "implement_fix"
+    name: "수정 구현"
+    type: "generate"
+    dependsOn: ["root_cause"]
+    context:
+      state: "generate"
+      identity:
+        role: "bug_fixer"
+        constraints:
+          - "최소 변경 원칙 — 버그 수정에 필요한 변경만"
+          - "주변 코드 리팩토링 금지"
+          - "수정 코드와 변경 이유 설명"
+      tools: ["file_read", "file_write"]
+    validation:
+      rules:
+        - type: "length"
+          spec: { min: 50 }
+          message: "수정 내용이 비어있음"
+
+  - id: "verify_fix"
+    name: "수정 검증"
+    type: "validate"
+    dependsOn: ["implement_fix"]
+    context:
+      state: "validate"
+      identity:
+        role: "fix_verifier"
+        constraints:
+          - "원래 버그가 수정되었는지 확인"
+          - "새로운 회귀가 없는지 확인"
+          - "테스트 실행 결과 보고"
+          - "수정 승인 또는 추가 작업 필요 판단"
+      tools: ["file_read", "shell"]
+    evaluation:
+      enabled: true
+      type: "custom"
+      threshold: 0.8
+      onFail: "retry"
+      maxRetries: 2
+      rubric: |
+        다음 기준으로 버그 수정을 평가하세요:
+        1. 근본 원인이 정확히 식별되었는가?
+        2. 수정이 최소 변경 원칙을 따랐는가?
+        3. 회귀 가능성이 없는가?
+        4. 수정 설명이 명확한가?
+    validation:
+      rules:
+        - type: "length"
+          spec: { min: 50 }
+          message: "검증 결과가 너무 짧음"

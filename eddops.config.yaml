@@ -1,0 +1,34 @@
+# EDDOps CLI 프로젝트 설정
+# 기본값: 단일 프로바이더, 단일 모델. 복잡도는 사용자가 명시적으로 올림.
+
+model:
+  default: "sonnet"
+  # 선택적: 단계 유형별 모델 오버라이드
+  # overrides:
+  #   classify: "anthropic/claude-haiku-4.5"   # 분류는 소형 모델
+  #   generate: "anthropic/claude-sonnet-4.6"   # 생성은 기본 모델
+  #   validate: "anthropic/claude-haiku-4.5"   # 검증은 소형 모델
+
+# MCP 서버 (선택적)
+# mcp:
+#   servers:
+#     - name: "web_search"
+#       transport: "stdio"
+#       command: "npx -y @anthropic/mcp-web-search"
+#     - name: "file_ops"
+#       transport: "stdio"
+#       command: "npx -y @anthropic/mcp-filesystem"
+
+# 트레이스 출력
+trace:
+  outputs:
+    - type: "stdout"
+    - type: "jsonl"
+      config:
+        path: "./traces/"
+
+# 오프라인 평가 (선택적)
+# eval:
+#   tier3:
+#     trigger: "manual"
+#     dataset: "./eval/datasets/"
