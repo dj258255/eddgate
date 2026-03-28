@@ -29,12 +29,17 @@ interface WorkflowEngineOptions {
   rolePrompts?: Map<string, string>;
   tracer?: TraceEmitter;
   maxBudgetUsd?: number;
+  modelOverrides?: {
+    classify?: string;
+    generate?: string;
+    validate?: string;
+  };
 }
 
 export async function executeWorkflow(
   options: WorkflowEngineOptions,
 ): Promise<WorkflowResult> {
-  const { workflow, input, rolePrompts, maxBudgetUsd } = options;
+  const { workflow, input, rolePrompts, maxBudgetUsd, modelOverrides } = options;
   const tracer = options.tracer ?? new TraceEmitter();
   const results = new Map<string, StepResult>();
   const stepResults: StepResult[] = [];
@@ -61,6 +66,7 @@ export async function executeWorkflow(
           workflow.config.defaultModel,
           rolePrompts?.get(step.context.identity.role),
           tracer,
+          modelOverrides,
         );
       });
 
@@ -106,6 +112,7 @@ export async function executeWorkflow(
         workflow.config.defaultModel,
         rolePrompts?.get(step.context.identity.role),
         tracer,
+        modelOverrides,
       );
 
       results.set(step.id, stepResult);
@@ -164,9 +171,10 @@ async function executeStep(
   defaultModel: string,
   rolePrompt: string | undefined,
   tracer: TraceEmitter,
+  modelOverrides?: { classify?: string; generate?: string; validate?: string },
 ): Promise<StepResult> {
   const stepStart = performance.now();
-  const context = buildContext(step, previousResults, defaultModel);
+  const context = buildContext(step, previousResults, defaultModel, modelOverrides);
   const trace: StepResult["trace"] = [];
 
   tracer.stepStart(step.id, context);

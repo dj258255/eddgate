@@ -18,12 +18,17 @@ export function buildContext(
   step: StepDefinition,
   previousResults: Map<string, StepResult>,
   defaultModel: string,
+  modelOverrides?: { classify?: string; generate?: string; validate?: string },
 ): ExecutionContext {
+  // Model resolution priority: step.model > config overrides by step type > default
+  const typeOverride = modelOverrides?.[step.type as keyof typeof modelOverrides];
+  const resolvedModel = step.model ?? typeOverride ?? step.context.identity.model ?? defaultModel;
+
   const ctx: ExecutionContext = {
     state: step.type,
     identity: {
       role: step.context.identity.role,
-      model: step.model ?? step.context.identity.model ?? defaultModel,
+      model: resolvedModel,
       constraints: step.context.identity.constraints,
     },
     tools: step.context.tools,

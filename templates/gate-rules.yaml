@@ -1,0 +1,23 @@
+# eddgate deployment gate rules
+# Used with: eddgate gate --results eval-results.json --rules gate-rules.yaml
+
+rules:
+  # Overall quality must be above threshold
+  - metric: "avg_score"
+    condition: ">= 0.75"
+    message: "Average evaluation score below minimum"
+
+  # No step should score below 0.5
+  - metric: "min_score"
+    condition: ">= 0.5"
+    message: "At least one step scored critically low"
+
+  # Pass rate must be above 80%
+  - metric: "pass_rate"
+    condition: ">= 0.8"
+    message: "Too many evaluation failures"
+
+  # Groundedness must be above threshold
+  - metric: "groundedness_avg"
+    condition: ">= 0.7"
+    message: "Groundedness score too low"

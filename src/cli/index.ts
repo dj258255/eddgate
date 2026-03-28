@@ -11,6 +11,9 @@ import { doctorCommand } from "./commands/doctor.js";
 import { diffEvalCommand } from "./commands/diff-eval.js";
 import { mcpCommand } from "./commands/mcp.js";
 import { vizCommand } from "./commands/viz.js";
+import { monitorCommand } from "./commands/monitor.js";
+import { gateCommand } from "./commands/gate.js";
+import { versionDiffCommand } from "./commands/version-diff.js";
 
 const program = new Command();
 
@@ -30,7 +33,7 @@ program
   .description("Check environment and config health")
   .option("-c, --config <path>", "Config file", "./eddgate.config.yaml")
   .option("-w, --workflows-dir <path>", "Workflows directory", "./workflows")
-  .option("--ci", "CI mode (Claude CLI check becomes warning instead of failure)")
+  .option("--ci", "CI mode (Claude CLI check becomes warning)")
   .action(doctorCommand);
 
 program
@@ -83,6 +86,27 @@ program
   .option("-a, --after <commit>", "After commit hash", "HEAD")
   .option("-d, --dir <path>", "Traces directory", "./traces")
   .action(diffEvalCommand);
+
+program
+  .command("gate")
+  .description("Run deployment gate check on evaluation results")
+  .requiredOption("-r, --results <path>", "Evaluation results JSON file")
+  .requiredOption("--rules <path>", "Gate rules YAML file")
+  .action(gateCommand);
+
+program
+  .command("monitor <action>")
+  .description("View aggregated metrics (actions: status, cost, quality)")
+  .option("-d, --dir <path>", "Traces directory", "./traces")
+  .option("-p, --period <period>", "Time period (e.g., 7d, 24h, 30d)", "7d")
+  .action(monitorCommand);
+
+program
+  .command("version-diff")
+  .description("Show prompt/workflow changes between git commits")
+  .option("-c, --commit <hash>", "Compare against commit", "HEAD~1")
+  .option("--paths <paths>", "Comma-separated paths to track", "templates/prompts,templates/workflows")
+  .action(versionDiffCommand);
 
 program
   .command("mcp <action> [args...]")
