@@ -21,10 +21,10 @@
   />
 
   <!-- Right arrow: points straight DOWN, at right end of top arc -->
-  <polygon points="366,220 398,220 382,256" fill="#58a6ff"/>
+  <polygon points="354,216 410,216 382,268" fill="#58a6ff"/>
 
   <!-- Left arrow: points straight UP, at left end of bottom arc -->
-  <polygon points="146,292 114,292 130,256" fill="#58a6ff"/>
+  <polygon points="158,296 102,296 130,244" fill="#58a6ff"/>
 
   <!-- Gate bars top -->
   <rect x="228" y="108" width="16" height="72" rx="8" fill="#3fb950"/>
