@@ -1,0 +1,12 @@
+src/
+tests/
+traces/
+.obsidian/
+.claude/
+*.ts
+!dist/**/*.d.ts
+tsconfig.json
+test-*
+firebase-debug.log
+RESEARCH_ANALYSIS.md
+CRITICAL_ANALYSIS.md

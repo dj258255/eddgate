@@ -60,7 +60,7 @@ interface ExecutionContext {
   state: "classify" | "retrieve" | "generate" | "validate" | "review";
   identity: {
     role: string;        // "link_researcher" | "content_consolidator" | ...
-    model: string;       // "anthropic/claude-sonnet-4.6"
+    model: string;       // "sonnet"
     constraints: string[]; // ["raw_url_only", "no_hallucination"]
   };
   tools: string[];       // ["web_search", "file_read", ...]
@@ -146,7 +146,7 @@ name: "EDDOps Document Pipeline"
 description: "6단계 문서 처리 파이프라인 (실무 검증)"
 
 config:
-  defaultModel: "anthropic/claude-sonnet-4.6"
+  defaultModel: "sonnet"
   topology: "pipeline"
   onValidationFail: "block"
 
@@ -440,7 +440,7 @@ interface MCPServerDefinition {
 ```typescript
 interface ModelConfig {
   // 기본 모델 (모든 단계에서 사용)
-  default: string;               // "anthropic/claude-sonnet-4.6"
+  default: string;               // "sonnet"
   // 선택적 오버라이드 (사용자 명시)
   overrides?: {
     classify?: string;           // 분류용 (소형 모델 가능)
@@ -658,45 +658,35 @@ WorkflowResult (단일 데이터 소스)
 
 ```bash
 # 워크플로우 실행
-eddops run <workflow> --input <file|string> [--config <path>] [--report <path>] [--tui]
-
-# 사용 가능한 워크플로우 목록
-eddops list workflows
-
-# 역할 목록
-eddops list roles
+eddops run <workflow> --input <file> [--report <path>] [--tui] [--trace-jsonl <path>]
 
 # 단일 단계만 실행 (디버깅용)
 eddops step <workflow> <step-id> --input <file>
 
 # 트레이스 조회
-eddops trace <trace-id> [--format json|summary]
+eddops trace <trace-id-or-file> [--format json|summary]
 
-# 오프라인 평가 실행
-eddops eval <workflow> --dataset <path> [--output <path>]
+# 오프라인 평가
+eddops eval <workflow> [--dataset <path>] [--output <path>] [--model <model>]
 
-# MCP 서버 관리
-eddops mcp list
-eddops mcp add <name> --transport <type> --command <cmd>
-
-# 프롬프트 테스트 (변경 전후 비교)
-eddops diff-eval <workflow> --before <commit> --after <commit>
+# 워크플로우/역할 목록
+eddops list workflows
+eddops list roles
 ```
 
 ---
 
-## 기술 스택 (제안)
+## 기술 스택
 
 | 레이어 | 선택 | 이유 |
 |--------|------|------|
-| **언어** | TypeScript | AI SDK 생태계, MCP SDK, npm 생태계 |
-| **LLM 호출** | Vercel AI SDK (`ai` 패키지) | 멀티 프로바이더 추상화, 스트리밍, 도구 호출 |
-| **MCP** | `@ai-sdk/mcp` | 표준 MCP 클라이언트 |
-| **CLI 프레임워크** | Commander.js 또는 Yargs | 성숙한 CLI 도구 |
-| **설정 파싱** | yaml + zod | YAML 설정 + 타입 안전 검증 |
-| **트레이스 출력** | 자체 JSONL + Langfuse SDK (선택) | 최소 비용, 확장 가능 |
-| **평가 (Tier 3)** | DeepEval 또는 RAGAS 연동 | 오픈소스 평가 프레임워크 |
-| **패키지 매니저** | pnpm | 모노레포 지원 |
+| **언어** | TypeScript | npm 생태계, 타입 안전 |
+| **LLM 호출** | Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`) | Claude Code CLI 내부 호출, Max 구독 활용, API 키 불필요 |
+| **CLI 프레임워크** | Commander.js | 성숙한 CLI 도구 |
+| **설정 파싱** | yaml + zod v4 | YAML 설정 + 타입 안전 검증 |
+| **트레이스 출력** | 자체 JSONL + stdout | 최소 비용, 확장 가능 |
+| **테스트** | vitest | 빠른 실행, ESM 네이티브 |
+| **렌더링** | 자체 HTML + readline TUI | 외부 의존성 0 |
 
 ---
 
@@ -830,32 +820,38 @@ eddops/
 
 ## Phase 로드맵
 
-**Phase 1 (MVP — 현재)**: CLI 코어 완성
+**Phase 1 (완료)**: CLI 코어 + 실행 검증
 
-1. ✅ Config Store — YAML 로드, Zod 검증
+1. ✅ Config Store — YAML 로드, Zod v4 검증
 2. ✅ Context Builder — 최소 실행 컨텍스트 생성
-3. ✅ Workflow Engine — 순차 파이프라인 실행
-4. ✅ Agent Runner — 단일 모델 에이전트 실행
-5. ✅ Eval Tier 1 — 규칙 기반 검증
-6. ✅ Trace (stdout + jsonl) — 구조화 로깅
-7. ✅ CLI — `eddops run`, `eddops list`
-8. ✅ HTML 리포트 생성
-9. ✅ 6단계 문서 파이프라인 템플릿
-10. ⬜ API 키 연결 + 실행 테스트
+3. ✅ Workflow Engine — pipeline/parallel/single 토폴로지
+4. ✅ Agent Runner — Claude Agent SDK (Max 구독, API 키 불필요)
+5. ✅ Eval Tier 1 — 규칙 기반 검증 (Zod, 오탐 0%)
+6. ✅ Eval Tier 2 — LLM 평가 (핵심 전환점, score 0~1 정규화)
+7. ✅ Trace (stdout + JSONL) — 구조화 로깅
+8. ✅ HTML 리포트 생성 (다크모드, 접기/펼치기)
+9. ✅ TUI 대시보드 (readline, 화살표 키 이동)
+10. ✅ CLI 커맨드: run, list, step, trace, eval
+11. ✅ human_approval 단계 타입
+12. ✅ 워크플로우 템플릿 3종 (document-pipeline, code-review, bug-fix)
+13. ✅ 역할 프롬프트 8개
+14. ✅ 유닛 테스트 41개 통과
+15. ✅ 8단계 파이프라인 실행 성공 (627s, 37K tokens, Max 구독)
+16. ✅ npm 패키지 준비
 
-**Phase 2**: Claude Code 플러그인 래퍼 (시장 검증)
+**Phase 2 (다음)**: 고도화
 
-- 플러그인 매니페스트 (`plugin.json`)
-- 슬래시 커맨드 (`/eddops:run`)
-- 에이전트 정의 (8개 역할)
-- Hook: CLI 코어 Node.js 호출
-- Max 구독 연동
+- Langfuse/OTel 트레이스 출력 어댑터
+- Tier 3 오프라인 평가 (CI/CD 연동, diff-eval)
+- MCP 서버 관리 커맨드
+- 추가 워크플로우 템플릿
+- GitHub Actions 연동 예시
 
-**Phase 3**: 검증 결과에 따라
+**Phase 3 (선택)**: 확장
 
-- 관심 있으면 → CLI 고도화 (MCP, Tier 2/3 eval, TUI, diff-eval)
-- 관심 없으면 → 피벗 또는 다른 플랫폼 래퍼 (Cursor, Copilot)
-- 코어가 독립이라 어느 쪽이든 유연
+- Claude Code 플러그인 래퍼 (시장 검증)
+- 다른 플랫폼 어댑터 (Cursor, Copilot)
+- 웹 대시보드
 
 ---
 

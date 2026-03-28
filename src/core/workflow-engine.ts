@@ -1,3 +1,4 @@
+import { createInterface } from "node:readline";
 import type {
   WorkflowDefinition,
   StepDefinition,
@@ -13,10 +14,10 @@ import { TraceEmitter } from "../trace/emitter.js";
 /**
  * Workflow Engine
  *
- * 순차 파이프라인 실행. 단계 간 데이터 전달.
- * 검색↔생성 강제 분리. Validation gate.
+ * pipeline/parallel/single 토폴로지 지원.
+ * 검색<->생성 강제 분리. Validation gate. Human approval.
  *
- * 핵심 규칙 (ARCHITECTURE.md):
+ * 핵심 규칙:
  * 1. 검색과 생성은 반드시 별도 Step
  * 2. Validation Step 필수
  * 3. 근거 부족 결과는 다음 단계 전달 금지
@@ -40,47 +41,89 @@ export async function executeWorkflow(
   const workflowStart = performance.now();
   tracer.workflowStart(workflow.name);
 
-  // 단계 실행 순서 결정 (의존성 기반 토폴로지 정렬)
   const orderedSteps = topologicalSort(workflow.steps);
 
-  for (const step of orderedSteps) {
-    // 의존성 단계가 실패했으면 스킵
-    if (hasDependencyFailure(step, results)) {
-      const skipped = createSkippedResult(step.id);
-      results.set(step.id, skipped);
-      stepResults.push(skipped);
-      tracer.error(step.id, "의존성 단계 실패로 스킵");
-      continue;
-    }
+  if (workflow.config.topology === "parallel") {
+    // parallel: 의존성 없는 단계들을 동시 실행
+    const layers = buildParallelLayers(orderedSteps);
 
-    const stepResult = await executeStep(
-      step,
-      input,
-      results,
-      workflow.config.defaultModel,
-      rolePrompts?.get(step.context.identity.role),
-      tracer,
-    );
-
-    results.set(step.id, stepResult);
-    stepResults.push(stepResult);
-
-    // 검증 실패 시 워크플로우 정책에 따라 처리
-    if (stepResult.status === "failed") {
-      if (workflow.config.onValidationFail === "block") {
-        tracer.workflowEnd(
-          "failed",
-          Math.round(performance.now() - workflowStart),
+    for (const layer of layers) {
+      const layerPromises = layer.map(async (step) => {
+        if (hasDependencyFailure(step, results)) {
+          return createSkippedResult(step.id);
+        }
+        return executeStep(
+          step,
+          input,
+          results,
+          workflow.config.defaultModel,
+          rolePrompts?.get(step.context.identity.role),
+          tracer,
         );
-        return buildWorkflowResult(
-          workflow.name,
-          tracer.getTraceId(),
-          "failed",
-          stepResults,
-          workflowStart,
-        );
+      });
+
+      const layerResults = await Promise.all(layerPromises);
+
+      for (let i = 0; i < layer.length; i++) {
+        results.set(layer[i].id, layerResults[i]);
+        stepResults.push(layerResults[i]);
+
+        if (
+          layerResults[i].status === "failed" &&
+          workflow.config.onValidationFail === "block"
+        ) {
+          tracer.workflowEnd(
+            "failed",
+            Math.round(performance.now() - workflowStart),
+          );
+          return buildWorkflowResult(
+            workflow.name,
+            tracer.getTraceId(),
+            "failed",
+            stepResults,
+            workflowStart,
+          );
+        }
       }
-      // "flag" 모드면 계속 진행
+    }
+  } else {
+    // pipeline / single: 순차 실행
+    for (const step of orderedSteps) {
+      if (hasDependencyFailure(step, results)) {
+        const skipped = createSkippedResult(step.id);
+        results.set(step.id, skipped);
+        stepResults.push(skipped);
+        tracer.error(step.id, "의존성 단계 실패로 스킵");
+        continue;
+      }
+
+      const stepResult = await executeStep(
+        step,
+        input,
+        results,
+        workflow.config.defaultModel,
+        rolePrompts?.get(step.context.identity.role),
+        tracer,
+      );
+
+      results.set(step.id, stepResult);
+      stepResults.push(stepResult);
+
+      if (stepResult.status === "failed") {
+        if (workflow.config.onValidationFail === "block") {
+          tracer.workflowEnd(
+            "failed",
+            Math.round(performance.now() - workflowStart),
+          );
+          return buildWorkflowResult(
+            workflow.name,
+            tracer.getTraceId(),
+            "failed",
+            stepResults,
+            workflowStart,
+          );
+        }
+      }
     }
   }
 
@@ -116,6 +159,29 @@ async function executeStep(
   tracer.stepStart(step.id, context);
 
   try {
+    // human_approval: 사람 승인 대기
+    if (step.type === "human_approval") {
+      const stepInput = getStepInput(step, originalInput, previousResults);
+      console.log("\n--- Human Approval Required ---");
+      console.log(stepInput.slice(0, 500));
+      console.log("\napprove / deny? ");
+
+      const answer = await askUser("approve/deny: ");
+      const approved = answer.trim().toLowerCase().startsWith("a");
+      const durationMs = Math.round(performance.now() - stepStart);
+
+      tracer.stepEnd(step.id, { latencyMs: durationMs });
+
+      return {
+        stepId: step.id,
+        status: approved ? "success" : "failed",
+        output: approved ? "approved" : "denied",
+        trace,
+        durationMs,
+        tokenUsage: { input: 0, output: 0 },
+      };
+    }
+
     // 에이전트 실행
     const stepInput = getStepInput(step, originalInput, previousResults);
     const agentOutput = await runAgent({
@@ -433,4 +499,56 @@ function normalizeScore(score: number): number {
   if (score > 5 && score <= 10) return score / 10;
   if (score > 10 && score <= 100) return score / 100;
   return Math.min(1, Math.max(0, score));
+}
+
+/**
+ * parallel 토폴로지용: 의존성이 같은 레이어끼리 묶어서 병렬 실행.
+ * 레이어 0: 의존성 없는 단계들 (동시 실행)
+ * 레이어 1: 레이어 0에 의존하는 단계들 (동시 실행)
+ * ...
+ */
+function buildParallelLayers(
+  steps: StepDefinition[],
+): StepDefinition[][] {
+  const layers: StepDefinition[][] = [];
+  const assigned = new Set<string>();
+
+  while (assigned.size < steps.length) {
+    const layer: StepDefinition[] = [];
+
+    for (const step of steps) {
+      if (assigned.has(step.id)) continue;
+
+      const deps = step.dependsOn ?? [];
+      if (deps.every((d) => assigned.has(d))) {
+        layer.push(step);
+      }
+    }
+
+    if (layer.length === 0) break; // 순환 의존성 방지
+
+    for (const step of layer) {
+      assigned.add(step.id);
+    }
+
+    layers.push(layer);
+  }
+
+  return layers;
+}
+
+/**
+ * stdin에서 사용자 입력 읽기 (human_approval 용).
+ */
+function askUser(prompt: string): Promise<string> {
+  return new Promise((resolve) => {
+    const rl = createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    rl.question(prompt, (answer) => {
+      rl.close();
+      resolve(answer);
+    });
+  });
 }
