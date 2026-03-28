@@ -1,0 +1,99 @@
+{
+  "app": {
+    "title": "eddgate",
+    "subtitle": "평가 게이트 워크플로우 엔진"
+  },
+  "menu": {
+    "whatToDo": "무엇을 하시겠습니까?",
+    "run": "워크플로우 실행",
+    "runHint": "검증 게이트와 함께 실행",
+    "analyze": "실패 분석",
+    "analyzeHint": "패턴 탐지, 규칙 생성",
+    "test": "회귀 테스트",
+    "testHint": "스냅샷/diff 동작 비교",
+    "mcp": "MCP 서버",
+    "mcpHint": "추가, 제거, 목록",
+    "config": "설정",
+    "configHint": "모델, 트레이스, 언어",
+    "exit": "종료",
+    "back": "돌아가기",
+    "bye": "bye"
+  },
+  "run": {
+    "workflow": "워크플로우를 선택하세요",
+    "inputMethod": "입력 방식",
+    "selectFile": "파일 선택",
+    "typeText": "직접 입력",
+    "input": "입력 (텍스트 또는 파일 경로)",
+    "model": "모델을 선택하세요",
+    "effort": "정밀도를 선택하세요",
+    "thinking": "확장 사고",
+    "budget": "최대 예산 USD (건너뛰려면 엔터)",
+    "reportPath": "HTML 리포트 경로 (건너뛰려면 엔터)",
+    "tracePath": "JSONL 트레이스 경로 (건너뛰려면 엔터)",
+    "confirm": "실행하시겠습니까?",
+    "noWorkflows": "워크플로우가 없습니다. eddgate init을 실행하세요.",
+    "cancelled": "취소되었습니다.",
+    "fileSelect": "파일 또는 폴더를 선택하세요",
+    "parentDir": ".. (상위 폴더)",
+    "selected": "선택됨"
+  },
+  "model": {
+    "sonnet": "일상 작업에 가장 효율적",
+    "opus": "고난도 작업에 가장 강력",
+    "haiku": "가장 빠른 응답",
+    "opus45": "이전 세대, 여전히 강력",
+    "sonnet45": "이전 세대 균형형"
+  },
+  "effort": {
+    "low": "빠르게",
+    "medium": "표준 (기본)",
+    "high": "꼼꼼하게",
+    "max": "최대 품질"
+  },
+  "thinking": {
+    "disabled": "일반 모드",
+    "adaptive": "필요할 때 사고",
+    "enabled": "항상 깊이 사고"
+  },
+  "analyze": {
+    "contextMode": "컨텍스트 윈도우 프로파일러 모드?",
+    "generateRules": "검증 규칙을 자동 생성할까요?"
+  },
+  "test": {
+    "action": "테스트 작업",
+    "snapshot": "스냅샷 저장",
+    "snapshotHint": "현재 동작을 기준선으로 저장",
+    "diff": "Diff 실행",
+    "diffHint": "기준선과 비교",
+    "listSnapshots": "스냅샷 목록"
+  },
+  "mcp": {
+    "title": "MCP 서버",
+    "list": "서버 목록",
+    "add": "새 서버 추가",
+    "remove": "서버 제거",
+    "serverName": "서버 이름",
+    "transport": "전송 방식",
+    "command": "명령어",
+    "url": "URL",
+    "added": "추가됨",
+    "removed": "제거됨",
+    "noServers": "MCP 서버가 설정되어 있지 않습니다."
+  },
+  "settings": {
+    "title": "설정",
+    "defaultModel": "기본 모델",
+    "language": "언어",
+    "traces": "트레이스 출력 설정",
+    "viewConfig": "현재 설정 보기",
+    "jsonlDir": "JSONL 트레이스 디렉토리",
+    "langfusePublic": "LANGFUSE_PUBLIC_KEY",
+    "langfuseSecret": "LANGFUSE_SECRET_KEY",
+    "langfuseConfigured": "Langfuse가 설정되었습니다.",
+    "toggleStdout": "stdout 출력 토글",
+    "setJsonl": "JSONL 트레이스 디렉토리 설정",
+    "configureLangfuse": "Langfuse 설정",
+    "languageSet": "언어가 한국어로 설정되었습니다."
+  }
+}

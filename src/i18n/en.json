@@ -1,0 +1,99 @@
+{
+  "app": {
+    "title": "eddgate",
+    "subtitle": "Evaluation-gated workflow engine"
+  },
+  "menu": {
+    "whatToDo": "What do you want to do?",
+    "run": "Run a workflow",
+    "runHint": "execute with eval gates",
+    "analyze": "Analyze failures",
+    "analyzeHint": "find patterns, generate rules",
+    "test": "Regression test",
+    "testHint": "snapshot/diff behavior",
+    "mcp": "MCP servers",
+    "mcpHint": "add, remove, list",
+    "config": "Settings",
+    "configHint": "model, traces, language",
+    "exit": "Exit",
+    "back": "Back",
+    "bye": "bye"
+  },
+  "run": {
+    "workflow": "Select a workflow",
+    "inputMethod": "Input method",
+    "selectFile": "Select file",
+    "typeText": "Type text",
+    "input": "Input (text or file path)",
+    "model": "Select a model",
+    "effort": "Select effort level",
+    "thinking": "Extended thinking",
+    "budget": "Max budget USD (enter to skip)",
+    "reportPath": "HTML report path (enter to skip)",
+    "tracePath": "JSONL trace path (enter to skip)",
+    "confirm": "Run this workflow?",
+    "noWorkflows": "No workflows found. Run: eddgate init",
+    "cancelled": "Cancelled.",
+    "fileSelect": "Select a file or folder",
+    "parentDir": ".. (parent folder)",
+    "selected": "Selected"
+  },
+  "model": {
+    "sonnet": "Most efficient for everyday tasks",
+    "opus": "Most capable for complex tasks",
+    "haiku": "Fastest responses",
+    "opus45": "Previous generation, still strong",
+    "sonnet45": "Previous generation balanced"
+  },
+  "effort": {
+    "low": "Quick",
+    "medium": "Standard (default)",
+    "high": "Thorough",
+    "max": "Maximum quality"
+  },
+  "thinking": {
+    "disabled": "Standard mode",
+    "adaptive": "Think when needed",
+    "enabled": "Always think deeply"
+  },
+  "analyze": {
+    "contextMode": "Context window profiler mode?",
+    "generateRules": "Auto-generate validation rules?"
+  },
+  "test": {
+    "action": "Test action",
+    "snapshot": "Save snapshot",
+    "snapshotHint": "capture current behavior as baseline",
+    "diff": "Run diff",
+    "diffHint": "compare against baseline",
+    "listSnapshots": "List snapshots"
+  },
+  "mcp": {
+    "title": "MCP servers",
+    "list": "List servers",
+    "add": "Add new server",
+    "remove": "Remove server",
+    "serverName": "Server name",
+    "transport": "Transport",
+    "command": "Command",
+    "url": "URL",
+    "added": "Added",
+    "removed": "Removed",
+    "noServers": "No MCP servers configured."
+  },
+  "settings": {
+    "title": "Settings",
+    "defaultModel": "Default model",
+    "language": "Language",
+    "traces": "Trace output settings",
+    "viewConfig": "View current config",
+    "jsonlDir": "JSONL traces directory",
+    "langfusePublic": "LANGFUSE_PUBLIC_KEY",
+    "langfuseSecret": "LANGFUSE_SECRET_KEY",
+    "langfuseConfigured": "Langfuse configured.",
+    "toggleStdout": "Toggle stdout output",
+    "setJsonl": "Set JSONL trace directory",
+    "configureLangfuse": "Configure Langfuse",
+    "languageSet": "Language set to English."
+  }
+}
