@@ -1,0 +1,34 @@
+name: Evaluation on Prompt Change
+
+on:
+  push:
+    paths:
+      - 'templates/prompts/**'
+      - 'templates/workflows/**'
+    branches: [main]
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install and build
+        run: npm ci && npm run build
+
+      - name: Validate workflow graphs
+        run: node dist/cli/index.js doctor -w templates/workflows
+
+      - name: Dry-run all workflows
+        run: |
+          for wf in templates/workflows/*.yaml; do
+            name=$(basename "$wf" .yaml)
+            node dist/cli/index.js run "$name" --dry-run -w templates/workflows
+          done

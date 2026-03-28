@@ -1,0 +1,73 @@
+name: "Translation Pipeline"
+description: "3-step translation: analyze source, translate, verify quality"
+
+config:
+  defaultModel: "sonnet"
+  topology: "pipeline"
+  onValidationFail: "flag"
+
+steps:
+  - id: "analyze_source"
+    name: "Source Analysis"
+    type: "classify"
+    context:
+      state: "classify"
+      identity:
+        role: "doc_writer"
+        constraints:
+          - "Identify source language and target language"
+          - "Detect technical terms that need special handling"
+          - "Note cultural context and tone"
+          - "Identify sections that should not be translated (code, URLs, names)"
+      tools: []
+    validation:
+      rules:
+        - type: "length"
+          spec: { min: 30 }
+          message: "Source analysis too short"
+
+  - id: "translate"
+    name: "Translation"
+    type: "generate"
+    dependsOn: ["analyze_source"]
+    context:
+      state: "generate"
+      identity:
+        role: "doc_writer"
+        constraints:
+          - "Translate accurately while preserving meaning and tone"
+          - "Keep technical terms consistent"
+          - "Preserve formatting (markdown, code blocks, lists)"
+          - "Do not translate code snippets, URLs, or proper nouns"
+      tools: []
+    validation:
+      rules:
+        - type: "length"
+          spec: { min: 50 }
+          message: "Translation too short"
+
+  - id: "verify_quality"
+    name: "Quality Verification"
+    type: "validate"
+    dependsOn: ["translate"]
+    context:
+      state: "validate"
+      identity:
+        role: "validator"
+        constraints:
+          - "Compare translation against source for accuracy"
+          - "Check for missing sections or content"
+          - "Verify technical terms are correctly translated"
+          - "Check formatting preservation"
+      tools: []
+    evaluation:
+      enabled: true
+      type: "groundedness"
+      threshold: 0.8
+      onFail: "retry"
+      maxRetries: 2
+    validation:
+      rules:
+        - type: "length"
+          spec: { min: 30 }
+          message: "Verification result too short"

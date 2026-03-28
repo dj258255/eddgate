@@ -1,0 +1,71 @@
+name: "API Design Pipeline"
+description: "3-step API design: requirements analysis, endpoint design, documentation"
+
+config:
+  defaultModel: "sonnet"
+  topology: "pipeline"
+  onValidationFail: "block"
+
+steps:
+  - id: "analyze_requirements"
+    name: "Requirements Analysis"
+    type: "classify"
+    context:
+      state: "classify"
+      identity:
+        role: "backend_dev"
+        constraints:
+          - "Extract API requirements from the input"
+          - "Identify entities, relationships, and operations"
+          - "List authentication and authorization needs"
+      tools: ["file_read"]
+    validation:
+      rules:
+        - type: "length"
+          spec: { min: 100 }
+          message: "Requirements analysis too short"
+
+  - id: "design_endpoints"
+    name: "Endpoint Design"
+    type: "generate"
+    dependsOn: ["analyze_requirements"]
+    context:
+      state: "generate"
+      identity:
+        role: "backend_dev"
+        constraints:
+          - "Design RESTful endpoints following OpenAPI patterns"
+          - "Include request/response schemas"
+          - "Define error responses and status codes"
+          - "Consider pagination, filtering, and sorting"
+      tools: []
+    evaluation:
+      enabled: true
+      type: "relevance"
+      threshold: 0.7
+      onFail: "flag"
+    validation:
+      rules:
+        - type: "length"
+          spec: { min: 200 }
+          message: "Endpoint design too short"
+
+  - id: "generate_docs"
+    name: "API Documentation"
+    type: "generate"
+    dependsOn: ["design_endpoints"]
+    context:
+      state: "generate"
+      identity:
+        role: "doc_writer"
+        constraints:
+          - "Generate API documentation from endpoint design"
+          - "Include usage examples with curl/fetch"
+          - "Document authentication flow"
+          - "Add error handling guidelines"
+      tools: []
+    validation:
+      rules:
+        - type: "length"
+          spec: { min: 300 }
+          message: "Documentation too short"

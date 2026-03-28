@@ -111,6 +111,23 @@ export async function runCommand(
       );
     }
 
+    // Config-driven trace outputs (Langfuse, OTel)
+    if (projectConfig?.trace?.outputs) {
+      for (const output of projectConfig.trace.outputs) {
+        if (output.type === "langfuse") {
+          const { createLangfuseListener } = await import(
+            "../../trace/outputs/langfuse.js"
+          );
+          tracer.onEvent(createLangfuseListener(output.config as Record<string, string>));
+        } else if (output.type === "otel") {
+          const { createOtelListener } = await import(
+            "../../trace/outputs/otel.js"
+          );
+          tracer.onEvent(createOtelListener(output.config as Record<string, string>));
+        }
+      }
+    }
+
     // 실행
     if (!options.quiet && !options.json) {
       console.log(

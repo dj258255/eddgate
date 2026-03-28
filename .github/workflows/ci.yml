@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20, 22]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Dry-run all workflows
+        run: |
+          node dist/cli/index.js run document-pipeline --dry-run -w templates/workflows
+          node dist/cli/index.js run code-review --dry-run -w templates/workflows
+          node dist/cli/index.js run bug-fix --dry-run -w templates/workflows
+
+      - name: List workflows and roles
+        run: |
+          node dist/cli/index.js list workflows -d templates/workflows
+          node dist/cli/index.js list roles -d templates/roles

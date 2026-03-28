@@ -8,6 +8,9 @@ import { traceCommand } from "./commands/trace.js";
 import { evalCommand } from "./commands/eval.js";
 import { initCommand } from "./commands/init.js";
 import { doctorCommand } from "./commands/doctor.js";
+import { diffEvalCommand } from "./commands/diff-eval.js";
+import { mcpCommand } from "./commands/mcp.js";
+import { vizCommand } from "./commands/viz.js";
 
 const program = new Command();
 
@@ -71,6 +74,27 @@ program
   .option("-w, --workflows-dir <path>", "Workflows directory", "./workflows")
   .option("-m, --model <model>", "Model for evaluation", "sonnet")
   .action(evalCommand);
+
+program
+  .command("diff-eval <workflow>")
+  .description("Compare evaluation scores between git commits")
+  .option("-b, --before <commit>", "Before commit hash", "HEAD~1")
+  .option("-a, --after <commit>", "After commit hash", "HEAD")
+  .option("-d, --dir <path>", "Traces directory", "./traces")
+  .action(diffEvalCommand);
+
+program
+  .command("mcp <action> [args...]")
+  .description("Manage MCP servers (actions: list, add, remove)")
+  .option("-c, --config <path>", "Config file", "./eddgate.config.yaml")
+  .action((action: string, args: string[], opts) => mcpCommand(action, opts, args));
+
+program
+  .command("viz <workflow>")
+  .description("Visualize workflow as diagram")
+  .option("-w, --workflows-dir <path>", "Workflows directory", "./workflows")
+  .option("-f, --format <format>", "Output format: ascii | mermaid", "mermaid")
+  .action(vizCommand);
 
 program
   .command("list <type>")
