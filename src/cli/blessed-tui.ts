@@ -370,6 +370,7 @@ async function handleAnalyze(): Promise<void> {
       { value: "failure", label: t("panel.clusterPatterns") },
       { value: "context", label: t("panel.contextProfiler") },
       { value: "eval", label: "Offline eval (re-score traces)" },
+      { value: "ab-test", label: "A/B prompt test (compare variants)" },
       { value: "diff-eval", label: "Diff eval (compare between commits)" },
       { value: "version-diff", label: "Version diff (prompt changes)" },
     ],
@@ -378,6 +379,51 @@ async function handleAnalyze(): Promise<void> {
 
   if (action === "eval") {
     await handleOfflineEval();
+    return;
+  }
+
+  if (action === "ab-test") {
+    const wfs = await findWorkflows("./workflows")
+      .then((w) => w.length > 0 ? w : findWorkflows("./templates/workflows"));
+    if (wfs.length === 0) { await blessedMessage(screen, "No workflows found.", { label: "Error" }); return; }
+    const wf = await blessedSelect(screen, {
+      message: "Select workflow",
+      items: wfs.map((w) => ({ value: w, label: w })),
+    });
+    if (!wf) return;
+
+    const promptA = await blessedInput(screen, { message: "Prompt A file (e.g. templates/prompts/analyzer.md)" });
+    if (!promptA) return;
+    const promptB = await blessedInput(screen, { message: "Prompt B file (e.g. templates/prompts/analyzer.v2.md)" });
+    if (!promptB) return;
+
+    const inputMethod = await blessedSelect(screen, {
+      message: t("run.inputMethod"),
+      items: [
+        { value: "file", label: t("run.selectFile") },
+        { value: "text", label: t("run.typeText") },
+      ],
+    });
+    if (!inputMethod) return;
+    let inputVal: string | null;
+    if (inputMethod === "file") {
+      inputVal = await blessedFileBrowser(screen, { label: "Select input" });
+    } else {
+      inputVal = await blessedInput(screen, { message: "Input text" });
+    }
+    if (!inputVal) return;
+
+    const iterStr = await blessedInput(screen, { message: "Iterations per variant (default: 3)" });
+    const iterations = iterStr && !isNaN(Number(iterStr)) ? Number(iterStr) : 3;
+
+    await runCapturedCommand("A/B Test", "magenta", async () => {
+      const { abTestCommand } = await import("./commands/ab-test.js");
+      await abTestCommand({
+        workflow: wf, promptA, promptB, input: inputVal!,
+        iterations, workflowsDir: "./templates/workflows", promptsDir: "./templates/prompts",
+      });
+    });
+    await updateContent(1);
     return;
   }
 
@@ -698,6 +744,8 @@ async function handlePlugins(): Promise<void> {
       { value: "roles", label: "Roles", hint: "installed role definitions" },
       { value: "viz", label: "Visualize workflow", hint: "ASCII or Mermaid diagram" },
       { value: "step", label: "Debug single step", hint: "run one step in isolation" },
+      { value: "rag-index", label: "RAG index", hint: "chunk + upsert to Pinecone" },
+      { value: "rag-search", label: "RAG search", hint: "search Pinecone index" },
       { value: "import-wf", label: "Import workflow", hint: "from file" },
       { value: "import-role", label: "Import role", hint: "from file" },
     ],
@@ -733,6 +781,34 @@ async function handlePlugins(): Promise<void> {
       const content = roles.map((r, i) => `  ${i + 1}. {cyan-fg}${r}{/cyan-fg}`).join("\n");
       await blessedMessage(screen, `{bold}Installed Roles:{/bold}\n\n${content}`, { label: "Roles" });
     }
+    return;
+  }
+
+  if (action === "rag-index") {
+    const dir = await blessedFileBrowser(screen, { label: "Select documents folder" });
+    if (!dir) return;
+    const indexName = await blessedInput(screen, { message: "Pinecone index name" });
+    if (!indexName) return;
+    const ns = await blessedInput(screen, { message: "Namespace (enter to skip)" });
+
+    await runCapturedCommand("RAG Index", "magenta", async () => {
+      const { ragIndexCommand } = await import("./commands/rag.js");
+      await ragIndexCommand({ dir, index: indexName, namespace: ns || undefined });
+    });
+    return;
+  }
+
+  if (action === "rag-search") {
+    const indexName = await blessedInput(screen, { message: "Pinecone index name" });
+    if (!indexName) return;
+    const query = await blessedInput(screen, { message: "Search query" });
+    if (!query) return;
+    const ns = await blessedInput(screen, { message: "Namespace (enter to skip)" });
+
+    await runCapturedCommand("RAG Search", "magenta", async () => {
+      const { ragSearchCommand } = await import("./commands/rag.js");
+      await ragSearchCommand(query, { index: indexName, namespace: ns || undefined });
+    });
     return;
   }
 

@@ -16,6 +16,8 @@ import { gateCommand } from "./commands/gate.js";
 import { versionDiffCommand } from "./commands/version-diff.js";
 import { analyzeCommand } from "./commands/analyze.js";
 import { testCommand } from "./commands/test.js";
+import { ragIndexCommand, ragSearchCommand } from "./commands/rag.js";
+import { abTestCommand } from "./commands/ab-test.js";
 
 // No args = blessed TUI mode
 if (process.argv.length <= 2) {
@@ -154,6 +156,49 @@ function launchCLI(): void {
     .option("-w, --workflows-dir <path>", "Workflows dir", "./workflows")
     .option("-f, --format <fmt>", "mermaid | ascii", "mermaid")
     .action(vizCommand);
+
+  // RAG
+  const rag = advanced.command("rag").description("RAG pipeline: index | search");
+
+  rag.command("index")
+    .description("Index documents to Pinecone")
+    .requiredOption("-d, --dir <path>", "Documents directory")
+    .requiredOption("--index <name>", "Pinecone index name")
+    .option("-n, --namespace <ns>", "Namespace")
+    .option("--chunk-size <n>", "Chunk size in chars", "1000")
+    .option("--chunk-overlap <n>", "Overlap between chunks", "200")
+    .action((opts) => ragIndexCommand({
+      dir: opts.dir, index: opts.index, namespace: opts.namespace,
+      chunkSize: parseInt(opts.chunkSize), chunkOverlap: parseInt(opts.chunkOverlap),
+    }));
+
+  rag.command("search <query>")
+    .description("Search Pinecone index")
+    .requiredOption("--index <name>", "Pinecone index name")
+    .option("-n, --namespace <ns>", "Namespace")
+    .option("-k, --top-k <n>", "Top K results", "5")
+    .option("-t, --threshold <n>", "Score threshold")
+    .action((query, opts) => ragSearchCommand(query, {
+      index: opts.index, namespace: opts.namespace,
+      topK: parseInt(opts.topK), threshold: opts.threshold ? parseFloat(opts.threshold) : undefined,
+    }));
+
+  // A/B Test
+  advanced.command("ab-test")
+    .description("A/B prompt comparison test")
+    .requiredOption("--workflow <name>", "Workflow name")
+    .requiredOption("--prompt-a <path>", "Prompt variant A file")
+    .requiredOption("--prompt-b <path>", "Prompt variant B file")
+    .requiredOption("-i, --input <file>", "Input file or text")
+    .option("-n, --iterations <n>", "Runs per variant", "3")
+    .option("-m, --model <model>", "Model override")
+    .option("-w, --workflows-dir <path>", "Workflows dir", "./templates/workflows")
+    .option("-p, --prompts-dir <path>", "Prompts dir", "./templates/prompts")
+    .action((opts) => abTestCommand({
+      workflow: opts.workflow, promptA: opts.promptA, promptB: opts.promptB,
+      input: opts.input, iterations: parseInt(opts.iterations), model: opts.model,
+      workflowsDir: opts.workflowsDir, promptsDir: opts.promptsDir,
+    }));
 
   program.parse();
 }

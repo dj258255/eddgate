@@ -1,0 +1,89 @@
+name: "RAG Pipeline"
+description: "Retrieve-Augmented Generation with Pinecone vector search"
+config:
+  defaultModel: "sonnet"
+  topology: "pipeline"
+  onValidationFail: "block"
+
+steps:
+  - id: "classify_query"
+    name: "Classify Query"
+    type: "classify"
+    context:
+      state: "classify"
+      identity:
+        role: "analyzer"
+        constraints:
+          - "Classify the user query into categories: factual, analytical, creative, procedural"
+          - "Extract key search terms for vector retrieval"
+          - "Output JSON with fields: category, searchTerms, intent"
+      tools: []
+    validation:
+      rules:
+        - type: "required_fields"
+          spec: { fields: ["category", "searchTerms"] }
+          message: "category and searchTerms required"
+
+  - id: "retrieve_context"
+    name: "Retrieve from Vector Store"
+    type: "retrieve"
+    dependsOn: ["classify_query"]
+    context:
+      state: "retrieve"
+      identity:
+        role: "rag_searcher"
+        constraints:
+          - "Search the Pinecone index for relevant documents"
+          - "Use the search terms from the previous classification step"
+          - "Return top 5 most relevant chunks with scores"
+      tools: ["mcp:pinecone:search-records"]
+    validation:
+      rules:
+        - type: "length"
+          spec: { min: 50 }
+          message: "Retrieved context too short"
+
+  - id: "generate_answer"
+    name: "Generate Grounded Answer"
+    type: "generate"
+    dependsOn: ["retrieve_context"]
+    context:
+      state: "generate"
+      identity:
+        role: "doc_writer"
+        constraints:
+          - "Generate answer ONLY from the retrieved context"
+          - "Cite sources for each claim"
+          - "If context is insufficient, say so explicitly"
+          - "Do not hallucinate or add information not in the context"
+      tools: []
+    evaluation:
+      enabled: true
+      type: "groundedness"
+      threshold: 0.7
+      onFail: "retry"
+      maxRetries: 2
+
+  - id: "validate_answer"
+    name: "Validate Groundedness"
+    type: "validate"
+    dependsOn: ["generate_answer"]
+    context:
+      state: "validate"
+      identity:
+        role: "validator"
+        constraints:
+          - "Check that every claim in the answer is supported by the retrieved context"
+          - "Flag any unsupported claims"
+          - "Output JSON: { grounded: boolean, unsupportedClaims: string[], confidence: number }"
+      tools: []
+    validation:
+      rules:
+        - type: "required_fields"
+          spec: { fields: ["grounded", "confidence"] }
+          message: "grounded and confidence fields required"
+    evaluation:
+      enabled: true
+      type: "groundedness"
+      threshold: 0.8
+      onFail: "block"

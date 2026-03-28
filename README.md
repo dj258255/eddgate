@@ -173,12 +173,12 @@ Run `eddgate` for the full-screen terminal UI. Everything is accessible from men
 | Menu | What it does |
 |------|-------------|
 | **Run** | Select workflow, model, effort, thinking mode, input. Configure run options (HTML report, JSONL trace, budget limit, dry run). Live dashboard during execution. Results panel with step table after completion. |
-| **Analyze** | Failure analysis, context profiler, offline eval (re-score traces with LLM judge), diff-eval (compare scores between git commits), version-diff (prompt/workflow changes between commits). |
+| **Analyze** | Failure analysis, context profiler, offline eval, A/B prompt test, diff-eval, version-diff. |
 | **Test** | Snapshot, diff, list snapshots, deployment gate (check thresholds). |
 | **Monitor** | Status overview (success rate gauge, metrics table), cost breakdown (bar chart by model, table by step), quality scores (eval averages with distribution bars). All from saved traces. |
 | **Traces** | Browse saved trace files. Select one to view: steps summary (left) + full event timeline (right) with color-coded events, token counts, scores. |
 | **MCP** | Add/remove/list MCP servers without editing YAML. |
-| **Plugins** | View workflows/roles, visualize workflow (ASCII diagram), debug single step in isolation, import from file. |
+| **Plugins** | View workflows/roles, visualize workflow, debug single step, RAG index/search (Pinecone MCP), import from file. |
 | **Settings** | Default model, language (Korean/English), view config, doctor (health check), init (scaffold project). |
 
 Keyboard: Arrow keys navigate, Enter selects, Esc goes back, q quits, Tab switches panels.
@@ -265,6 +265,71 @@ All TUI actions are also available as commands for scripting and CI pipelines.
 | `eddgate advanced trace <file>` | View JSONL trace with timeline. |
 | `eddgate advanced mcp <action>` | Manage MCP servers: `list`, `add`, `remove`. |
 | `eddgate advanced version-diff` | Prompt/workflow changes between git commits. |
+| `eddgate advanced rag index` | Chunk documents and upsert to Pinecone via MCP. |
+| `eddgate advanced rag search <query>` | Search Pinecone index, return ranked chunks. |
+| `eddgate advanced ab-test` | Run same workflow with two prompt variants, compare scores. |
+
+## RAG Pipeline (Pinecone MCP)
+
+Index documents into Pinecone, then use vector search in workflows.
+
+```bash
+# Index documents
+eddgate advanced rag index -d docs/ --index my-docs
+
+# Search
+eddgate advanced rag search "how does auth work?" --index my-docs
+```
+
+Or from the TUI: **Plugins > RAG index / RAG search**.
+
+Built-in `rag-pipeline` workflow: classify query -> vector search -> grounded generation -> validate groundedness.
+
+```yaml
+steps:
+  - id: "retrieve_context"
+    type: "retrieve"
+    context:
+      tools: ["mcp:pinecone:search-records"]
+  - id: "generate_answer"
+    type: "generate"
+    evaluation:
+      type: "groundedness"
+      threshold: 0.7
+```
+
+Requires Pinecone MCP server configured in `eddgate.config.yaml`.
+
+## A/B Prompt Testing
+
+Compare two prompt variants on the same workflow and input.
+
+```bash
+eddgate advanced ab-test \
+  --workflow document-pipeline \
+  --prompt-a templates/prompts/analyzer.md \
+  --prompt-b templates/prompts/analyzer.v2.md \
+  -i input.txt \
+  -n 3
+```
+
+Or from the TUI: **Analyze > A/B prompt test**.
+
+Output:
+
+```
+  Metric               Variant A      Variant B      Delta
+  ──────────────────── ────────────── ────────────── ──────────────
+  Avg Score            0.742          0.819          +0.077
+  Avg Tokens           8,450          7,200          -1,250
+  Avg Cost             $0.0234        $0.0198        -0.0036
+  Avg Time             12.3s          10.8s          -1.5s
+
+  Winner: Variant B
+  Score advantage: 0.077
+```
+
+Winner logic: higher score wins. If scores within 0.02, lower cost wins.
 
 ## Workflow Definition
 
@@ -341,6 +406,7 @@ Auto-detects backend:
 | bug-fix | 4 | Reproduce, root cause, fix, verify |
 | api-design | 3 | Requirements, endpoints, docs |
 | translation | 3 | Analyze, translate, verify |
+| rag-pipeline | 4 | Query classify, vector search, grounded generation, validate |
 
 ## Evaluation Thresholds
 

@@ -237,3 +237,67 @@ export interface MCPServerConfig {
   env?: Record<string, string>;
   allowedRoles?: string[];
 }
+
+// ─── RAG Pipeline ────────────────────────────────────────
+
+export interface RAGConfig {
+  indexName: string;
+  namespace?: string;
+  topK: number;
+  scoreThreshold?: number;
+  chunkSize?: number;
+  chunkOverlap?: number;
+}
+
+export interface RAGIndexResult {
+  indexName: string;
+  documentsProcessed: number;
+  chunksCreated: number;
+  chunksUpserted: number;
+  durationMs: number;
+}
+
+export interface RAGSearchResult {
+  query: string;
+  chunks: RetrievalChunk[];
+  durationMs: number;
+}
+
+// ─── A/B Prompt Testing ─────────────────────────────────
+
+export type ABVariant = "A" | "B";
+
+export interface ABTestConfig {
+  workflow: string;
+  promptA: string;
+  promptB: string;
+  input: string;
+  iterations: number;
+  model?: string;
+}
+
+export interface ABTestResult {
+  variant: ABVariant;
+  runs: Array<{
+    iteration: number;
+    status: string;
+    evalScores: Record<string, number>;
+    totalTokens: number;
+    totalCost: number;
+    durationMs: number;
+  }>;
+  avgScore: number;
+  avgTokens: number;
+  avgCost: number;
+  avgDurationMs: number;
+}
+
+export interface ABComparison {
+  config: ABTestConfig;
+  resultA: ABTestResult;
+  resultB: ABTestResult;
+  winner: ABVariant | "tie";
+  scoreDelta: number;
+  costDelta: number;
+  tokenDelta: number;
+}
