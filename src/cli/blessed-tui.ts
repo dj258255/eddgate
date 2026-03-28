@@ -156,12 +156,11 @@ async function handleRun(): Promise<void> {
   const confirmed = await blessedConfirm(screen, { message: `Run ${wf} with ${model}?` });
   if (!confirmed) return;
 
-  // Run workflow -- need to exit blessed for streaming output
-  screen.destroy();
+  // Clear main panels for dashboard
+  menuBox.hide();
+  contentBox.hide();
 
   const { setEffort, setThinking } = await import("../core/agent-runner.js");
-  const { runCommand } = await import("./commands/run.js");
-
   if (effort !== "medium") setEffort(effort);
   if (thinking !== "disabled") setThinking(thinking);
 
@@ -170,38 +169,97 @@ async function handleRun(): Promise<void> {
   let promptsDir = resolve("./prompts");
   try { await readdir(promptsDir); } catch { promptsDir = resolve("./templates/prompts"); }
 
-  await runCommand(wf, {
-    input,
+  // Load workflow to get step IDs
+  const { loadWorkflow, loadPrompt } = await import("../config/loader.js");
+  const workflow = await loadWorkflow(resolve(wfDir, `${wf}.yaml`));
+  workflow.config.defaultModel = model;
+
+  // Load role prompts
+  const rolePrompts = new Map<string, string>();
+  for (const step of workflow.steps) {
+    const role = step.context.identity.role;
+    if (!rolePrompts.has(role)) {
+      try { rolePrompts.set(role, await loadPrompt(resolve(promptsDir, `${role}.md`))); } catch { /* */ }
+    }
+  }
+
+  // Create blessed execution dashboard
+  const { createRunDashboard } = await import("./blessed-runner.js");
+  const dashboard = createRunDashboard({
+    screen,
+    workflowName: workflow.name,
+    stepIds: workflow.steps.map((s) => s.id),
     model,
-    effort,
-    config: "./eddgate.config.yaml",
-    workflowsDir: wfDir,
-    rolesDir: "./roles",
-    promptsDir,
-    tui: false,
-    interactive: false,
-    quiet: false,
-    json: false,
-    dryRun: false,
   });
 
-  console.log("\nPress any key to return...");
-  await waitKey();
-  await launchBlessedTUI();
+  // Run with tracer connected to dashboard
+  const { TraceEmitter } = await import("../trace/emitter.js");
+  const tracer = new TraceEmitter();
+  tracer.onEvent(dashboard.onEvent);
+
+  const { executeWorkflow } = await import("../core/workflow-engine.js");
+
+  await executeWorkflow({ workflow, input, rolePrompts, tracer });
+
+  // Wait for key, then return to main menu
+  await new Promise<void>((res) => {
+    screen.onceKey(["escape", "q", "enter", "space"], () => res());
+  });
+
+  dashboard.destroy();
+  menuBox.show();
+  contentBox.show();
+  menuBox.focus();
+  await updateContent(0);
+  screen.render();
 }
 
 async function handleAnalyze(): Promise<void> {
   const ctx = await blessedConfirm(screen, { message: t("analyze.contextMode") });
   const gen = await blessedConfirm(screen, { message: t("analyze.generateRules") });
 
-  screen.destroy();
+  // Run analyze and capture output
+  menuBox.hide();
+  contentBox.hide();
+
+  const outputBox = blessed.log({
+    parent: screen,
+    top: 1, left: 0, width: "100%", height: "100%-2",
+    tags: true,
+    border: { type: "line" },
+    style: { border: { fg: "yellow" } },
+    label: ` ${t("menu.analyze")} `,
+    scrollable: true,
+    alwaysScroll: true,
+    scrollbar: { style: { bg: "yellow" } },
+    mouse: true,
+    padding: { left: 1 },
+  });
+
+  // Capture console.log
+  const origLog = console.log;
+  console.log = (...args: unknown[]) => {
+    outputBox.log(args.map(String).join(" "));
+    screen.render();
+  };
 
   const { analyzeCommand } = await import("./commands/analyze.js");
   await analyzeCommand({ dir: "./traces", context: ctx, generateRules: gen, output: "./eval/rules" });
 
-  console.log("\nPress any key to return...");
-  await waitKey();
-  await launchBlessedTUI();
+  console.log = origLog;
+  outputBox.log("\n{gray-fg}Press any key to return...{/gray-fg}");
+  screen.render();
+
+  await new Promise<void>((res) => {
+    screen.onceKey(["escape", "q", "enter", "space"], () => res());
+  });
+
+  outputBox.destroy();
+  menuBox.show();
+  contentBox.show();
+  menuBox.focus();
+  await updateContent(1);
+  screen.render();
 }
 
 async function handleTest(): Promise<void> {
@@ -215,14 +273,56 @@ async function handleTest(): Promise<void> {
   });
   if (!action) return;
 
-  screen.destroy();
+  menuBox.hide();
+  contentBox.hide();
+
+  const outputBox = blessed.log({
+    parent: screen,
+    top: 1, left: 0, width: "100%", height: "100%-2",
+    tags: true,
+    border: { type: "line" },
+    style: { border: { fg: "green" } },
+    label: ` ${t("menu.test")} `,
+    scrollable: true,
+    alwaysScroll: true,
+    scrollbar: { style: { bg: "green" } },
+    mouse: true,
+    padding: { left: 1 },
+  });
+
+  const origLog = console.log;
+  const origError = console.error;
+  console.log = (...args: unknown[]) => {
+    outputBox.log(args.map(String).join(" "));
+    screen.render();
+  };
+  console.error = console.log;
+
+  // Override process.exit so test diff doesn't kill us
+  const origExit = process.exit;
+  let exitCalled = false;
+  (process as any).exit = (code?: number) => { exitCalled = true; };
 
   const { testCommand } = await import("./commands/test.js");
   await testCommand(action, { dir: "./traces" });
 
-  console.log("\nPress any key to return...");
-  await waitKey();
-  await launchBlessedTUI();
+  console.log = origLog;
+  console.error = origError;
+  (process as any).exit = origExit;
+
+  outputBox.log("\n{gray-fg}Press any key to return...{/gray-fg}");
+  screen.render();
+
+  await new Promise<void>((res) => {
+    screen.onceKey(["escape", "q", "enter", "space"], () => res());
+  });
+
+  outputBox.destroy();
+  menuBox.show();
+  contentBox.show();
+  menuBox.focus();
+  await updateContent(2);
+  screen.render();
 }
 
 async function handleMcp(): Promise<void> {
