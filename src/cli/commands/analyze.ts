@@ -10,58 +10,41 @@ interface AnalyzeOptions {
   output?: string;
 }
 
-// ─── Failure Pattern ─────────────────────────────────────────
-
 interface FailureInstance {
   traceId: string;
   stepId: string;
-  type: "validation_fail" | "eval_fail" | "error" | "low_score";
+  type: "validation_fail" | "eval_fail" | "error";
   message: string;
   score?: number;
-  context?: {
-    role?: string;
-    model?: string;
-    inputTokens?: number;
-    outputTokens?: number;
-  };
+  role?: string;
+  tokens?: number;
 }
 
 interface FailureCluster {
   id: string;
-  pattern: string;
+  stepId: string;
+  failureType: string;
+  description: string;
   count: number;
   percentage: number;
+  avgScore?: number;
+  scoreRange?: { min: number; max: number };
   instances: FailureInstance[];
-  suggestedFix: string;
-  suggestedRule?: GeneratedRule;
+  fix: string;
+  rules: GeneratedRule[];
 }
 
 interface GeneratedRule {
+  filename: string;
   type: string;
   spec: Record<string, unknown>;
   message: string;
-}
-
-// ─── Context Profile ─────────────────────────────────────────
-
-interface ContextProfile {
-  totalTokens: number;
-  breakdown: {
-    systemPrompt: number;
-    tools: number;
-    history: number;
-    retrieval: number;
-    other: number;
-  };
-  waste: string[];
-  recommendations: string[];
+  context: string;
 }
 
 // ─── Main ────────────────────────────────────────────────────
 
-export async function analyzeCommand(
-  options: AnalyzeOptions,
-): Promise<void> {
+export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
   const tracesDir = resolve(options.dir);
   const events = await loadAllTraces(tracesDir);
 
@@ -70,33 +53,30 @@ export async function analyzeCommand(
     return;
   }
 
+  const traceCount = new Set(events.map((e) => e.traceId)).size;
   console.log(chalk.bold("\neddgate analyze\n"));
-  console.log(chalk.dim(`  traces: ${tracesDir}`));
-  console.log(chalk.dim(`  events: ${events.length}\n`));
+  console.log(chalk.dim(`  ${events.length} events from ${traceCount} run(s)\n`));
 
   if (options.context) {
-    // Context Window Profiler mode
-    const profile = analyzeContextWindows(events);
-    renderContextProfile(profile);
-  } else {
-    // Error Analysis mode
-    const failures = extractFailures(events);
+    renderContextProfile(events);
+    return;
+  }
 
-    if (failures.length === 0) {
-      console.log(chalk.green("  No failures found in traces.\n"));
-      return;
-    }
+  const failures = extractFailures(events);
+  if (failures.length === 0) {
+    console.log(chalk.green("  No failures found.\n"));
+    return;
+  }
 
-    const clusters = clusterFailures(failures, events.length);
-    renderClusters(clusters);
+  const clusters = clusterFailures(failures);
+  renderClusters(clusters, traceCount);
 
-    if (options.generateRules) {
-      await generateRuleFiles(clusters, options.output ?? "./eval/rules");
-    }
+  if (options.generateRules) {
+    await generateRuleFiles(clusters, options.output ?? "./eval/rules");
   }
 }
 
-// ─── Error Analysis ──────────────────────────────────────────
+// ─── Failure Extraction ──────────────────────────────────────
 
 function extractFailures(events: TraceEvent[]): FailureInstance[] {
   const failures: FailureInstance[] = [];
@@ -111,10 +91,7 @@ function extractFailures(events: TraceEvent[]): FailureInstance[] {
             stepId: event.stepId,
             type: "validation_fail",
             message: f.rule.message,
-            context: {
-              role: event.context?.identity.role,
-              model: event.context?.identity.model ?? undefined,
-            },
+            role: event.context?.identity.role,
           });
         }
       }
@@ -127,11 +104,9 @@ function extractFailures(events: TraceEvent[]): FailureInstance[] {
           traceId: event.traceId,
           stepId: event.stepId,
           type: "eval_fail",
-          message: er.reasoning ?? `score ${er.score} below threshold`,
+          message: er.reasoning ?? "",
           score: er.score,
-          context: {
-            role: event.context?.identity.role,
-          },
+          role: event.context?.identity.role,
         });
       }
     }
@@ -141,7 +116,7 @@ function extractFailures(events: TraceEvent[]): FailureInstance[] {
         traceId: event.traceId,
         stepId: event.stepId,
         type: "error",
-        message: event.data.error ?? "unknown error",
+        message: event.data.error ?? "unknown",
       });
     }
   }
@@ -149,17 +124,22 @@ function extractFailures(events: TraceEvent[]): FailureInstance[] {
   return failures;
 }
 
-function clusterFailures(
-  failures: FailureInstance[],
-  totalEvents: number,
-): FailureCluster[] {
-  // Group by step + type + message pattern
+// ─── Clustering: step + type + score band ────────────────────
+
+function clusterFailures(failures: FailureInstance[]): FailureCluster[] {
+  // Group by step + type (NOT by message -- that's what caused 6 clusters for 1 problem)
   const groups = new Map<string, FailureInstance[]>();
 
   for (const f of failures) {
-    // Normalize message for grouping
-    const normalized = normalizeMessage(f.message);
-    const key = `${f.stepId}:${f.type}:${normalized}`;
+    // Errors subgroup by category (rate limit, timeout, other)
+    let subtype = "";
+    if (f.type === "error") {
+      if (f.message.includes("limit") || f.message.includes("rate")) subtype = ":rate_limit";
+      else if (f.message.includes("timeout") || f.message.includes("ETIMEDOUT")) subtype = ":timeout";
+      else subtype = ":runtime";
+    }
+
+    const key = `${f.stepId}:${f.type}${subtype}`;
     const arr = groups.get(key) ?? [];
     arr.push(f);
     groups.set(key, arr);
@@ -169,271 +149,287 @@ function clusterFailures(
   let id = 1;
 
   for (const [key, instances] of groups) {
-    const [stepId, type, pattern] = key.split(":");
-    const percentage = (instances.length / Math.max(1, failures.length)) * 100;
+    const parts = key.split(":");
+    const stepId = parts[0];
+    const failureType = parts.slice(1).join(":");
+    const percentage = (instances.length / failures.length) * 100;
 
-    clusters.push({
+    // Score stats for eval failures
+    const scores = instances.filter((i) => i.score !== undefined).map((i) => i.score!);
+    const avgScore = scores.length > 0 ? scores.reduce((s, x) => s + x, 0) / scores.length : undefined;
+    const scoreRange = scores.length > 0 ? { min: Math.min(...scores), max: Math.max(...scores) } : undefined;
+
+    const cluster: FailureCluster = {
       id: `C${id++}`,
-      pattern: `[${stepId}] ${type}: ${pattern}`,
+      stepId,
+      failureType,
+      description: buildDescription(failureType, stepId, instances, avgScore),
       count: instances.length,
       percentage,
+      avgScore,
+      scoreRange,
       instances,
-      suggestedFix: suggestFix(type, pattern, stepId, instances),
-      suggestedRule: suggestRule(type, pattern, instances),
-    });
+      fix: buildFix(failureType, stepId, instances, avgScore, scoreRange),
+      rules: buildRules(failureType, stepId, instances, avgScore, scoreRange),
+    };
+
+    clusters.push(cluster);
   }
 
-  // Sort by count descending
   clusters.sort((a, b) => b.count - a.count);
-
   return clusters;
 }
 
-function normalizeMessage(msg: string): string {
-  return msg
-    .replace(/\d+/g, "N")      // numbers -> N
-    .replace(/https?:\/\/\S+/g, "URL") // URLs -> URL
-    .replace(/\s+/g, " ")      // whitespace
-    .trim()
-    .slice(0, 80);
-}
-
-function suggestFix(type: string, pattern: string, stepId: string, instances: FailureInstance[]): string {
+function buildDescription(type: string, stepId: string, instances: FailureInstance[], avgScore?: number): string {
+  if (type === "eval_fail") {
+    return `Eval gate failed at "${stepId}" (avg score: ${avgScore?.toFixed(2) ?? "?"}, ${instances.length} times)`;
+  }
   if (type === "validation_fail") {
-    if (pattern.includes("too short") || pattern.includes("짧")) {
-      return `Lower the length threshold for step "${stepId}" or improve the prompt to generate more detailed output`;
-    }
-    if (pattern.includes("required") || pattern.includes("필수")) {
-      return `Add output format examples to the prompt for step "${stepId}" to ensure required fields are produced`;
-    }
-    if (pattern.includes("URL") || pattern.includes("http")) {
-      return `Add URL validation to the search step or constrain output to verified links only`;
-    }
-    return `Review validation rules for step "${stepId}" -- may be too strict or prompt may need clarification`;
+    const msgs = [...new Set(instances.map((i) => i.message))];
+    return `Validation failed at "${stepId}": ${msgs.join(", ")}`;
   }
-
-  if (type === "eval_fail") {
-    const avgScore = instances.reduce((s, i) => s + (i.score ?? 0), 0) / instances.length;
-    if (avgScore > 0.6) {
-      return `Scores averaging ${avgScore.toFixed(2)} -- consider lowering threshold or improving source quality`;
-    }
-    return `Low evaluation scores in "${stepId}" -- check if retrieval is returning relevant documents`;
+  if (type.includes("rate_limit")) {
+    return `Rate limit hit at "${stepId}" (${instances.length} times)`;
   }
-
-  if (type === "error") {
-    if (pattern.includes("limit") || pattern.includes("rate")) {
-      return `Rate limit hit -- add request throttling or upgrade subscription tier`;
-    }
-    if (pattern.includes("timeout") || pattern.includes("ETIMEDOUT")) {
-      return `Timeout errors -- increase timeout settings or check network connectivity`;
-    }
-    return `Runtime errors in "${stepId}" -- check logs for details`;
+  if (type.includes("timeout")) {
+    return `Timeout at "${stepId}" (${instances.length} times)`;
   }
-
-  return `Review step "${stepId}" configuration`;
+  return `Runtime error at "${stepId}" (${instances.length} times)`;
 }
 
-function suggestRule(type: string, pattern: string, instances: FailureInstance[]): GeneratedRule | undefined {
-  if (type === "validation_fail" && pattern.includes("short")) {
-    return {
+function buildFix(type: string, stepId: string, instances: FailureInstance[], avgScore?: number, range?: { min: number; max: number }): string {
+  if (type === "eval_fail" && avgScore !== undefined) {
+    if (avgScore >= 0.65) {
+      return `Scores are close to threshold (avg ${avgScore.toFixed(2)}). Options: (1) lower threshold slightly, (2) improve prompt specificity for "${stepId}", (3) add few-shot examples to the role prompt`;
+    }
+    if (avgScore >= 0.4) {
+      return `Moderate eval failures (avg ${avgScore.toFixed(2)}). Check: (1) is retrieval returning relevant docs? (2) is the prompt too vague? (3) consider splitting this step into smaller sub-steps`;
+    }
+    return `Severe eval failures (avg ${avgScore.toFixed(2)}). The step "${stepId}" may need fundamental redesign -- check if the task is too complex for a single step`;
+  }
+
+  if (type === "validation_fail") {
+    const msgs = [...new Set(instances.map((i) => i.message))];
+    if (msgs.some((m) => m.includes("short") || m.includes("짧"))) {
+      return `Output too short. Add "be detailed and comprehensive" to constraints, or lower the min length threshold`;
+    }
+    if (msgs.some((m) => m.includes("required") || m.includes("필수"))) {
+      return `Missing required fields. Add explicit output format example to the role prompt: "You MUST include these fields: ..."`;
+    }
+    return `Validation rule mismatch. Review rules for "${stepId}" -- they may be too strict for this model's output style`;
+  }
+
+  if (type.includes("rate_limit")) {
+    return `Rate limits are causing retries that waste tokens. Solutions: (1) add delay between steps, (2) use a smaller model for eval steps, (3) reduce maxRetries`;
+  }
+
+  if (type.includes("timeout")) {
+    return `Network timeouts. Check connection stability or increase timeout settings`;
+  }
+
+  return `Review step "${stepId}" configuration and logs`;
+}
+
+function buildRules(type: string, stepId: string, instances: FailureInstance[], avgScore?: number, range?: { min: number; max: number }): GeneratedRule[] {
+  const rules: GeneratedRule[] = [];
+
+  if (type === "eval_fail" && avgScore !== undefined) {
+    // Suggest adjusted threshold
+    if (range && range.max > 0.6) {
+      const suggestedThreshold = Math.round((range.max - 0.05) * 100) / 100;
+      rules.push({
+        filename: `${stepId}_adjusted_threshold.yaml`,
+        type: "evaluation_threshold",
+        spec: { step: stepId, threshold: suggestedThreshold },
+        message: `Adjusted threshold for ${stepId} based on observed score range ${range.min.toFixed(2)}-${range.max.toFixed(2)}`,
+        context: `${instances.length} eval failures, avg score ${avgScore.toFixed(2)}`,
+      });
+    }
+
+    // Suggest output quality check
+    rules.push({
+      filename: `${stepId}_output_quality.yaml`,
       type: "length",
-      spec: { min: 50 },
-      message: `Output too short (pattern from ${instances.length} failures)`,
-    };
+      spec: { min: 100, field: "output" },
+      message: `Ensure ${stepId} produces substantive output (prevents low eval scores from thin content)`,
+      context: `Added because eval scores suggest thin/incomplete outputs`,
+    });
   }
 
-  if (type === "eval_fail") {
-    const avgScore = instances.reduce((s, i) => s + (i.score ?? 0), 0) / instances.length;
-    return {
+  if (type === "validation_fail") {
+    const msgs = [...new Set(instances.map((i) => i.message))];
+    for (const msg of msgs) {
+      rules.push({
+        filename: `${stepId}_${sanitize(msg.slice(0, 20))}.yaml`,
+        type: "custom",
+        spec: { check: "prompt_reinforcement", step: stepId, constraint: msg },
+        message: msg,
+        context: `${instances.length} validation failures with this message`,
+      });
+    }
+  }
+
+  if (type.includes("rate_limit")) {
+    rules.push({
+      filename: `${stepId}_rate_limit_protection.yaml`,
       type: "custom",
-      spec: { check: "min_evidence_count", minCount: 2 },
-      message: `Ensure at least 2 evidence citations (avg eval score: ${avgScore.toFixed(2)})`,
-    };
+      spec: { check: "max_retries", maxRetries: 2 },
+      message: `Limit retries for ${stepId} to prevent rate limit exhaustion`,
+      context: `${instances.length} rate limit errors observed`,
+    });
   }
 
-  return undefined;
+  return rules;
 }
 
 // ─── Context Window Profiler ─────────────────────────────────
 
-function analyzeContextWindows(events: TraceEvent[]): ContextProfile {
+function renderContextProfile(events: TraceEvent[]): void {
   const llmCalls = events.filter((e) => e.type === "llm_call");
+  const traceCount = new Set(events.map((e) => e.traceId)).size;
 
-  let totalInput = 0;
-  let totalOutput = 0;
-  const stepTokens = new Map<string, number>();
+  console.log(chalk.bold("  Context Window Profile\n"));
 
+  // Per-step token analysis
+  const stepStats = new Map<string, { calls: number; inputTotal: number; outputTotal: number }>();
   for (const e of llmCalls) {
-    const input = e.data.inputTokens ?? 0;
-    const output = e.data.outputTokens ?? 0;
-    totalInput += input;
-    totalOutput += output;
-
-    const existing = stepTokens.get(e.stepId) ?? 0;
-    stepTokens.set(e.stepId, existing + input + output);
+    const existing = stepStats.get(e.stepId) ?? { calls: 0, inputTotal: 0, outputTotal: 0 };
+    existing.calls++;
+    existing.inputTotal += e.data.inputTokens ?? 0;
+    existing.outputTotal += e.data.outputTokens ?? 0;
+    stepStats.set(e.stepId, existing);
   }
 
-  // Estimate breakdown (heuristic based on typical patterns)
+  const totalInput = llmCalls.reduce((s, e) => s + (e.data.inputTokens ?? 0), 0);
+  const totalOutput = llmCalls.reduce((s, e) => s + (e.data.outputTokens ?? 0), 0);
   const totalTokens = totalInput + totalOutput;
-  const stepCount = new Set(llmCalls.map((e) => e.stepId)).size;
 
-  // System prompt is typically sent with every call
-  const estimatedSystemPerCall = Math.min(500, totalInput / Math.max(1, llmCalls.length) * 0.3);
-  const systemTotal = Math.round(estimatedSystemPerCall * llmCalls.length);
+  console.log(`  Total: ${totalTokens.toLocaleString()} tokens (${totalInput.toLocaleString()} in / ${totalOutput.toLocaleString()} out)`);
+  console.log(`  Across ${llmCalls.length} LLM calls in ${traceCount} run(s)\n`);
+
+  // Per-step breakdown
+  console.log(chalk.bold("  Per-step breakdown:\n"));
+  console.log(`  ${"Step".padEnd(25)} ${"Calls".padEnd(6)} ${"Input".padEnd(10)} ${"Output".padEnd(10)} ${"Total".padEnd(10)} ${"% of Total"}`);
+  console.log(`  ${"─".repeat(25)} ${"─".repeat(6)} ${"─".repeat(10)} ${"─".repeat(10)} ${"─".repeat(10)} ${"─".repeat(10)}`);
+
+  const sortedSteps = [...stepStats.entries()].sort((a, b) =>
+    (b[1].inputTotal + b[1].outputTotal) - (a[1].inputTotal + a[1].outputTotal),
+  );
 
   const waste: string[] = [];
   const recommendations: string[] = [];
 
-  // Find steps with disproportionate token usage
-  const avgPerStep = totalTokens / Math.max(1, stepCount);
-  for (const [step, tokens] of stepTokens) {
-    if (tokens > avgPerStep * 3) {
-      waste.push(`Step "${step}" uses ${tokens.toLocaleString()} tokens (${((tokens / totalTokens) * 100).toFixed(0)}% of total) -- consider splitting or optimizing`);
+  for (const [step, stats] of sortedSteps) {
+    const total = stats.inputTotal + stats.outputTotal;
+    const pct = ((total / Math.max(1, totalTokens)) * 100).toFixed(1);
+    const bar = chalk.cyan("=".repeat(Math.max(1, Math.round(parseFloat(pct) / 2.5))));
+
+    console.log(
+      `  ${step.padEnd(25)} ${String(stats.calls).padEnd(6)} ${stats.inputTotal.toLocaleString().padEnd(10)} ${stats.outputTotal.toLocaleString().padEnd(10)} ${total.toLocaleString().padEnd(10)} ${pct.padStart(5)}% ${bar}`,
+    );
+
+    // Waste detection
+    if (stats.calls > 2 * traceCount) {
+      const wastedTokens = Math.round(((stats.calls - traceCount) / stats.calls) * total);
+      waste.push(`"${step}" made ${stats.calls} calls (${traceCount} expected) -- ~${wastedTokens.toLocaleString()} tokens wasted on retries`);
+    }
+
+    if (stats.inputTotal > stats.outputTotal * 5) {
+      waste.push(`"${step}" input/output ratio is ${(stats.inputTotal / Math.max(1, stats.outputTotal)).toFixed(1)}:1 -- context may be bloated`);
     }
   }
 
-  // Check for repeated calls (retry indicator)
-  const callsPerStep = new Map<string, number>();
-  for (const e of llmCalls) {
-    callsPerStep.set(e.stepId, (callsPerStep.get(e.stepId) ?? 0) + 1);
+  // Recommendations
+  if (totalTokens > 50000 * traceCount) {
+    recommendations.push(`Average ${Math.round(totalTokens / traceCount).toLocaleString()} tokens per run -- context rot likely above 50K. Consider summarizing intermediate results.`);
   }
-  for (const [step, count] of callsPerStep) {
-    if (count > 2) {
-      waste.push(`Step "${step}" made ${count} LLM calls (possible retries wasting ${((count - 1) * (stepTokens.get(step) ?? 0) / count).toLocaleString()} tokens)`);
-      recommendations.push(`Reduce retries for "${step}" or lower eval threshold`);
+
+  const highestStep = sortedSteps[0];
+  if (highestStep) {
+    const highPct = ((highestStep[1].inputTotal + highestStep[1].outputTotal) / totalTokens) * 100;
+    if (highPct > 40) {
+      recommendations.push(`"${highestStep[0]}" consumes ${highPct.toFixed(0)}% of all tokens. Consider splitting into smaller steps or reducing its input.`);
     }
   }
 
-  // General recommendations
-  if (totalInput > 50000) {
-    recommendations.push("Total input tokens exceed 50K -- context rot likely. Consider summarizing intermediate results");
-  }
-  if (llmCalls.length > 15) {
-    recommendations.push(`${llmCalls.length} LLM calls is high -- check if some steps can be merged or removed`);
+  if (waste.length > 0) {
+    console.log(chalk.bold("\n  Waste detected:\n"));
+    for (const w of waste) console.log(chalk.yellow(`    ${w}`));
   }
 
-  return {
-    totalTokens,
-    breakdown: {
-      systemPrompt: systemTotal,
-      tools: 0, // Would need tool definitions to calculate
-      history: Math.round(totalInput * 0.2),
-      retrieval: Math.round(totalInput * 0.3),
-      other: Math.round(totalInput * 0.2),
-    },
-    waste,
-    recommendations,
-  };
-}
-
-// ─── Rendering ───────────────────────────────────────────────
-
-function renderClusters(clusters: FailureCluster[]): void {
-  console.log(chalk.bold("  Failure Patterns:\n"));
-
-  for (const c of clusters) {
-    const bar = "#".repeat(Math.max(1, Math.round(c.percentage / 3)));
-    console.log(`  ${chalk.red(c.id)} ${c.pattern}`);
-    console.log(`     ${chalk.dim(`${c.count} occurrences (${c.percentage.toFixed(0)}%)`)} ${chalk.red(bar)}`);
-    console.log(`     ${chalk.cyan("Fix:")} ${c.suggestedFix}`);
-    if (c.suggestedRule) {
-      console.log(`     ${chalk.yellow("Rule:")} ${c.suggestedRule.type} -- ${c.suggestedRule.message}`);
-    }
-    console.log();
-  }
-}
-
-function renderContextProfile(profile: ContextProfile): void {
-  console.log(chalk.bold("  Context Window Profile:\n"));
-
-  console.log(`  Total tokens: ${profile.totalTokens.toLocaleString()}\n`);
-
-  const { breakdown } = profile;
-  const total = Math.max(1, profile.totalTokens);
-
-  const items = [
-    { label: "System prompt", tokens: breakdown.systemPrompt },
-    { label: "Retrieval", tokens: breakdown.retrieval },
-    { label: "History", tokens: breakdown.history },
-    { label: "Other", tokens: breakdown.other },
-  ];
-
-  for (const item of items) {
-    const pct = ((item.tokens / total) * 100).toFixed(0);
-    const bar = "=".repeat(Math.max(1, Math.round(item.tokens / total * 40)));
-    console.log(`  ${item.label.padEnd(16)} ${item.tokens.toLocaleString().padStart(8)} (${pct.padStart(2)}%) ${chalk.cyan(bar)}`);
-  }
-
-  if (profile.waste.length > 0) {
-    console.log(chalk.bold("\n  Waste Detected:\n"));
-    for (const w of profile.waste) {
-      console.log(chalk.yellow(`  - ${w}`));
-    }
-  }
-
-  if (profile.recommendations.length > 0) {
+  if (recommendations.length > 0) {
     console.log(chalk.bold("\n  Recommendations:\n"));
-    for (const r of profile.recommendations) {
-      console.log(chalk.cyan(`  - ${r}`));
-    }
+    for (const r of recommendations) console.log(chalk.cyan(`    ${r}`));
   }
 
   console.log();
 }
 
-// ─── Rule Generation ─────────────────────────────────────────
+// ─── Rendering ───────────────────────────────────────────────
 
-async function generateRuleFiles(
-  clusters: FailureCluster[],
-  outputDir: string,
-): Promise<void> {
+function renderClusters(clusters: FailureCluster[], traceCount: number): void {
+  const totalFailures = clusters.reduce((s, c) => s + c.count, 0);
+  console.log(chalk.bold(`  ${totalFailures} failures in ${clusters.length} patterns:\n`));
+
+  for (const c of clusters) {
+    const pctBar = chalk.red("#".repeat(Math.max(1, Math.round(c.percentage / 2))));
+
+    console.log(chalk.bold(`  ${c.id} ${c.description}`));
+    console.log(`     ${c.count} occurrences (${c.percentage.toFixed(0)}% of failures) ${pctBar}`);
+
+    if (c.scoreRange) {
+      console.log(chalk.dim(`     Score range: ${c.scoreRange.min.toFixed(2)} - ${c.scoreRange.max.toFixed(2)}, avg: ${c.avgScore?.toFixed(2)}`));
+    }
+
+    console.log(chalk.cyan(`     Fix: ${c.fix}`));
+
+    if (c.rules.length > 0) {
+      for (const r of c.rules) {
+        console.log(chalk.yellow(`     Rule: ${r.filename} (${r.type})`));
+      }
+    }
+    console.log();
+  }
+}
+
+// ─── Rule File Generation ────────────────────────────────────
+
+async function generateRuleFiles(clusters: FailureCluster[], outputDir: string): Promise<void> {
   const dir = resolve(outputDir);
   await mkdir(dir, { recursive: true });
-
-  let generated = 0;
+  let count = 0;
 
   for (const cluster of clusters) {
-    if (!cluster.suggestedRule) continue;
+    for (const rule of cluster.rules) {
+      const filepath = join(dir, rule.filename);
+      const yaml = [
+        `# Auto-generated by: eddgate analyze --generate-rules`,
+        `# Cluster: ${cluster.id} -- ${cluster.description}`,
+        `# Context: ${rule.context}`,
+        `# Suggested fix: ${cluster.fix}`,
+        ``,
+        `type: "${rule.type}"`,
+        `spec:`,
+        ...Object.entries(rule.spec).map(([k, v]) => `  ${k}: ${JSON.stringify(v)}`),
+        `message: "${rule.message}"`,
+      ].join("\n");
 
-    const filename = `auto_${cluster.id.toLowerCase()}_${sanitize(cluster.pattern.slice(0, 30))}.yaml`;
-    const filepath = join(dir, filename);
-
-    const yaml = [
-      `# Auto-generated by eddgate analyze`,
-      `# Pattern: ${cluster.pattern}`,
-      `# Occurrences: ${cluster.count} (${cluster.percentage.toFixed(0)}%)`,
-      `# Suggested fix: ${cluster.suggestedFix}`,
-      ``,
-      `type: "${cluster.suggestedRule.type}"`,
-      `spec:`,
-      ...Object.entries(cluster.suggestedRule.spec).map(
-        ([k, v]) => `  ${k}: ${JSON.stringify(v)}`,
-      ),
-      `message: "${cluster.suggestedRule.message}"`,
-    ].join("\n");
-
-    await writeFile(filepath, yaml, "utf-8");
-    console.log(chalk.green(`  Generated: ${filepath}`));
-    generated++;
+      await writeFile(filepath, yaml, "utf-8");
+      console.log(chalk.green(`  Generated: ${filepath}`));
+      count++;
+    }
   }
 
-  if (generated === 0) {
-    console.log(chalk.dim("  No rules to generate."));
-  } else {
-    console.log(chalk.bold(`\n  ${generated} rule(s) generated in ${dir}\n`));
-  }
+  console.log(chalk.bold(`\n  ${count} rule(s) generated in ${dir}\n`));
 }
 
 function sanitize(s: string): string {
-  return s.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase();
+  return s.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase().slice(0, 30);
 }
-
-// ─── Trace Loading ───────────────────────────────────────────
 
 async function loadAllTraces(dir: string): Promise<TraceEvent[]> {
   const files = await readdir(dir).catch(() => []);
   const events: TraceEvent[] = [];
-
   for (const file of files) {
     if (!file.endsWith(".jsonl")) continue;
     const content = await readFile(join(dir, file), "utf-8");
@@ -441,6 +437,5 @@ async function loadAllTraces(dir: string): Promise<TraceEvent[]> {
       try { events.push(JSON.parse(line) as TraceEvent); } catch { /* skip */ }
     }
   }
-
   return events;
 }

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
+import chalk from "chalk";
 import { runCommand } from "./commands/run.js";
 import { listCommand } from "./commands/list.js";
 import { stepCommand } from "./commands/step.js";
@@ -27,6 +28,53 @@ if (process.argv.length <= 2) {
 }
 
 async function launchTUI(): Promise<void> {
+  const p = await import("@clack/prompts");
+
+  p.intro(chalk.bold("eddgate"));
+
+  const mode = await p.select({
+    message: "What do you want to do?",
+    options: [
+      { value: "run", label: "Run a workflow", hint: "execute with eval gates" },
+      { value: "analyze", label: "Analyze failures", hint: "find patterns, generate rules" },
+      { value: "test", label: "Regression test", hint: "snapshot/diff behavior" },
+    ],
+  });
+
+  if (p.isCancel(mode)) { p.cancel("Cancelled."); process.exit(0); }
+
+  if (mode === "analyze") {
+    const contextMode = await p.confirm({ message: "Context window profiler mode?" });
+    if (p.isCancel(contextMode)) { p.cancel("Cancelled."); process.exit(0); }
+
+    const genRules = await p.confirm({ message: "Auto-generate validation rules?" });
+    if (p.isCancel(genRules)) { p.cancel("Cancelled."); process.exit(0); }
+
+    await analyzeCommand({
+      dir: "./traces",
+      context: !!contextMode,
+      generateRules: !!genRules,
+      output: "./eval/rules",
+    });
+    process.exit(0);
+  }
+
+  if (mode === "test") {
+    const action = await p.select({
+      message: "Test action",
+      options: [
+        { value: "snapshot", label: "Save snapshot", hint: "capture current behavior as baseline" },
+        { value: "diff", label: "Run diff", hint: "compare against baseline" },
+        { value: "list", label: "List snapshots" },
+      ],
+    });
+    if (p.isCancel(action)) { p.cancel("Cancelled."); process.exit(0); }
+
+    await testCommand(action as string, { dir: "./traces" });
+    process.exit(0);
+  }
+
+  // mode === "run" -> launch workflow selector
   const result = await tuilauncher();
 
   if (result.cancelled) {
@@ -37,7 +85,6 @@ async function launchTUI(): Promise<void> {
     setEffort(result.effort);
   }
 
-  // Build args for run command
   await runCommand(result.workflow, {
     input: result.input,
     model: result.model,
@@ -48,7 +95,7 @@ async function launchTUI(): Promise<void> {
     report: result.report,
     traceJsonl: result.traceJsonl,
     maxBudgetUsd: result.maxBudgetUsd,
-    tui: true, // Show TUI dashboard after completion
+    tui: true,
     interactive: false,
     quiet: false,
     json: false,

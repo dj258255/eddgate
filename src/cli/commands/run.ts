@@ -9,6 +9,7 @@ import {
 import { interactiveSetup } from "../interactive-setup.js";
 import { executeWorkflow } from "../../core/workflow-engine.js";
 import { setEffort } from "../../core/agent-runner.js";
+import { loadAutoRules } from "../../eval/rule-loader.js";
 import {
   TraceEmitter,
   createStdoutListener,
@@ -107,6 +108,25 @@ export async function runCommand(
       console.error(chalk.red("입력이 비어있습니다. --input 옵션 사용"));
       process.exit(1);
     }
+
+    // Auto-generated rules 로드 (analyze --generate-rules로 생성된 것)
+    try {
+      const autoRules = await loadAutoRules("./eval/rules");
+      if (autoRules.size > 0) {
+        let added = 0;
+        for (const step of workflow.steps) {
+          const stepRules = autoRules.get(step.id);
+          if (stepRules?.length) {
+            if (!step.validation) step.validation = { rules: [] };
+            step.validation.rules.push(...stepRules);
+            added += stepRules.length;
+          }
+        }
+        if (added > 0 && !options.quiet && !options.json) {
+          console.log(chalk.dim(`  ${added} auto-generated rule(s) loaded from eval/rules/`));
+        }
+      }
+    } catch { /* no auto rules */ }
 
     // 역할 프롬프트 로드
     const rolePrompts = new Map<string, string>();
