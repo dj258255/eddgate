@@ -38,6 +38,8 @@ async function launchTUI(): Promise<void> {
       { value: "run", label: "Run a workflow", hint: "execute with eval gates" },
       { value: "analyze", label: "Analyze failures", hint: "find patterns, generate rules" },
       { value: "test", label: "Regression test", hint: "snapshot/diff behavior" },
+      { value: "mcp", label: "MCP servers", hint: "add, remove, list" },
+      { value: "config", label: "Settings", hint: "model, traces, budget" },
     ],
   });
 
@@ -74,6 +76,16 @@ async function launchTUI(): Promise<void> {
     process.exit(0);
   }
 
+  if (mode === "mcp") {
+    await tuiMcpManager(p);
+    process.exit(0);
+  }
+
+  if (mode === "config") {
+    await tuiConfigManager(p);
+    process.exit(0);
+  }
+
   // mode === "run" -> launch workflow selector
   const result = await tuilauncher();
 
@@ -101,6 +113,202 @@ async function launchTUI(): Promise<void> {
     json: false,
     dryRun: false,
   });
+}
+
+// ─── TUI: MCP Server Manager ────────────────────────────────
+
+async function tuiMcpManager(p: typeof import("@clack/prompts")): Promise<void> {
+  const { readFile, writeFile } = await import("node:fs/promises");
+  const { resolve } = await import("node:path");
+  const { parse: parseYaml, stringify: stringifyYaml } = await import("yaml");
+
+  const configPath = resolve("./eddgate.config.yaml");
+
+  let config: Record<string, unknown> = {};
+  try {
+    const raw = await readFile(configPath, "utf-8");
+    config = (parseYaml(raw) as Record<string, unknown>) ?? {};
+  } catch { /* no config */ }
+
+  const mcp = (config.mcp as { servers?: Array<Record<string, unknown>> }) ?? { servers: [] };
+  if (!mcp.servers) mcp.servers = [];
+
+  const action = await p.select({
+    message: "MCP servers",
+    options: [
+      { value: "list", label: `List servers (${mcp.servers.length})` },
+      { value: "add", label: "Add new server" },
+      { value: "remove", label: "Remove server" },
+    ],
+  });
+  if (p.isCancel(action)) return;
+
+  if (action === "list") {
+    if (mcp.servers.length === 0) {
+      p.log.info("No MCP servers configured.");
+    } else {
+      for (const s of mcp.servers) {
+        p.log.info(`${s.name} (${s.transport}) -- ${s.command ?? s.url ?? ""}`);
+      }
+    }
+    return;
+  }
+
+  if (action === "add") {
+    const name = await p.text({ message: "Server name" });
+    if (p.isCancel(name)) return;
+
+    const transport = await p.select({
+      message: "Transport",
+      options: [
+        { value: "stdio", label: "stdio", hint: "local command" },
+        { value: "http", label: "http", hint: "remote URL" },
+        { value: "sse", label: "sse", hint: "server-sent events" },
+      ],
+    });
+    if (p.isCancel(transport)) return;
+
+    let target: string | symbol;
+    if (transport === "stdio") {
+      target = await p.text({ message: "Command (e.g., npx -y @pinecone-database/mcp)" });
+    } else {
+      target = await p.text({ message: "URL (e.g., https://mcp.example.com)" });
+    }
+    if (p.isCancel(target)) return;
+
+    const server: Record<string, unknown> = {
+      name: name as string,
+      transport: transport as string,
+    };
+    if (transport === "stdio") server.command = target as string;
+    else server.url = target as string;
+
+    mcp.servers.push(server);
+    config.mcp = mcp;
+    await writeFile(configPath, stringifyYaml(config), "utf-8");
+    p.log.success(`Added: ${name as string} (${transport as string})`);
+    return;
+  }
+
+  if (action === "remove") {
+    if (mcp.servers.length === 0) {
+      p.log.info("No servers to remove.");
+      return;
+    }
+
+    const toRemove = await p.select({
+      message: "Remove which server?",
+      options: mcp.servers.map((s) => ({
+        value: s.name as string,
+        label: `${s.name} (${s.transport})`,
+      })),
+    });
+    if (p.isCancel(toRemove)) return;
+
+    mcp.servers = mcp.servers.filter((s) => s.name !== toRemove);
+    config.mcp = mcp;
+    await writeFile(configPath, stringifyYaml(config), "utf-8");
+    p.log.success(`Removed: ${toRemove as string}`);
+  }
+}
+
+// ─── TUI: Config/Settings Manager ────────────────────────────
+
+async function tuiConfigManager(p: typeof import("@clack/prompts")): Promise<void> {
+  const { readFile, writeFile } = await import("node:fs/promises");
+  const { resolve } = await import("node:path");
+  const { parse: parseYaml, stringify: stringifyYaml } = await import("yaml");
+
+  const configPath = resolve("./eddgate.config.yaml");
+
+  let config: Record<string, unknown> = {};
+  try {
+    const raw = await readFile(configPath, "utf-8");
+    config = (parseYaml(raw) as Record<string, unknown>) ?? {};
+  } catch {
+    p.log.warn("No config file found. Run: eddgate init");
+    return;
+  }
+
+  const model = (config.model as Record<string, unknown>) ?? { default: "sonnet" };
+
+  const setting = await p.select({
+    message: "Settings",
+    options: [
+      { value: "model", label: `Default model: ${model.default ?? "sonnet"}` },
+      { value: "traces", label: "Trace output settings" },
+      { value: "view", label: "View current config" },
+    ],
+  });
+  if (p.isCancel(setting)) return;
+
+  if (setting === "model") {
+    const newModel = await p.select({
+      message: "Default model",
+      options: [
+        { value: "sonnet", label: "sonnet", hint: "balanced" },
+        { value: "opus", label: "opus", hint: "most capable" },
+        { value: "haiku", label: "haiku", hint: "fast and cheap" },
+      ],
+      initialValue: (model.default as string) ?? "sonnet",
+    });
+    if (p.isCancel(newModel)) return;
+
+    model.default = newModel as string;
+    config.model = model;
+    await writeFile(configPath, stringifyYaml(config), "utf-8");
+    p.log.success(`Default model set to: ${newModel as string}`);
+    return;
+  }
+
+  if (setting === "traces") {
+    const traceAction = await p.select({
+      message: "Trace settings",
+      options: [
+        { value: "stdout", label: "Toggle stdout output" },
+        { value: "jsonl", label: "Set JSONL trace directory" },
+        { value: "langfuse", label: "Configure Langfuse" },
+      ],
+    });
+    if (p.isCancel(traceAction)) return;
+
+    if (traceAction === "jsonl") {
+      const dir = await p.text({ message: "JSONL traces directory", defaultValue: "./traces/" });
+      if (p.isCancel(dir)) return;
+
+      if (!config.trace) config.trace = { outputs: [] };
+      const trace = config.trace as { outputs: Array<Record<string, unknown>> };
+      // Remove existing jsonl, add new
+      trace.outputs = trace.outputs.filter((o) => o.type !== "jsonl");
+      trace.outputs.push({ type: "jsonl", config: { path: dir as string } });
+      await writeFile(configPath, stringifyYaml(config), "utf-8");
+      p.log.success(`JSONL traces: ${dir as string}`);
+    }
+
+    if (traceAction === "langfuse") {
+      const publicKey = await p.text({ message: "LANGFUSE_PUBLIC_KEY" });
+      if (p.isCancel(publicKey)) return;
+      const secretKey = await p.text({ message: "LANGFUSE_SECRET_KEY" });
+      if (p.isCancel(secretKey)) return;
+
+      if (!config.trace) config.trace = { outputs: [] };
+      const trace = config.trace as { outputs: Array<Record<string, unknown>> };
+      trace.outputs = trace.outputs.filter((o) => o.type !== "langfuse");
+      trace.outputs.push({
+        type: "langfuse",
+        config: { publicKey: publicKey as string, secretKey: secretKey as string },
+      });
+      await writeFile(configPath, stringifyYaml(config), "utf-8");
+      p.log.success("Langfuse configured.");
+    }
+
+    return;
+  }
+
+  if (setting === "view") {
+    const raw = await readFile(configPath, "utf-8");
+    p.log.info(raw);
+  }
 }
 
 function launchCLI(): void {
