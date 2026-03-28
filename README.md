@@ -248,6 +248,16 @@ jobs:
 
 `test diff` exits 1 on regression. `gate` exits 1 on threshold failure. CI blocks the merge.
 
+## Docs
+
+- [Architecture](docs/en/ARCHITECTURE.md)
+
 ## License
 
 MIT
+
+---
+
+<p align="center">
+  <a href="docs/ko/README.md">한국어</a>
+</p>
