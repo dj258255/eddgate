@@ -1,31 +1,39 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
-  <!--
-    eddgate logo
-    "Looping circle with gate and arrow"
-    - Arc with arrow = the loop keeps going (run -> analyze -> test -> run)
-    - Gate gap with bars = validation checkpoint
-    - Center dot = evaluation point
-  -->
-
   <!-- Background -->
-  <circle cx="256" cy="256" r="240" fill="#0d1117"/>
+  <circle cx="256" cy="256" r="240" fill="#0d1117" stroke="#30363d" stroke-width="3"/>
 
-  <!-- Main loop arc (270 degrees, gap at top-right for the gate) -->
+  <!-- Top arc (left to right) -->
   <path
-    d="M 340 108 A 170 170 0 1 1 172 108"
+    d="M 130 220 C 130 120, 382 120, 382 220"
     stroke="#58a6ff"
-    stroke-width="34"
-    stroke-linecap="round"
+    stroke-width="32"
     fill="none"
+    stroke-linecap="round"
   />
 
-  <!-- Arrow head at the end of arc (pointing right-downward, showing loop direction) -->
-  <polygon points="345,82 372,112 340,128" fill="#58a6ff"/>
+  <!-- Bottom arc (right to left) -->
+  <path
+    d="M 382 292 C 382 392, 130 392, 130 292"
+    stroke="#58a6ff"
+    stroke-width="32"
+    fill="none"
+    stroke-linecap="round"
+  />
 
-  <!-- Gate bars in the gap (top, between arrow and arc start) -->
-  <rect x="214" y="80" width="12" height="44" rx="6" fill="#3fb950"/>
-  <rect x="238" y="80" width="12" height="44" rx="6" fill="#3fb950"/>
+  <!-- Right arrow head (pointing straight down) -->
+  <polygon points="382,208 414,240 382,272" fill="#58a6ff"/>
+
+  <!-- Left arrow head (pointing straight up) -->
+  <polygon points="130,304 98,272 130,240" fill="#58a6ff"/>
+
+  <!-- Gate bars top -->
+  <rect x="228" y="108" width="16" height="72" rx="8" fill="#3fb950"/>
+  <rect x="268" y="108" width="16" height="72" rx="8" fill="#3fb950"/>
+
+  <!-- Gate bars bottom -->
+  <rect x="228" y="332" width="16" height="72" rx="8" fill="#3fb950"/>
+  <rect x="268" y="332" width="16" height="72" rx="8" fill="#3fb950"/>
 
   <!-- Center eval dot -->
-  <circle cx="256" cy="256" r="30" fill="#d29922"/>
+  <circle cx="256" cy="256" r="28" fill="#d29922"/>
 </svg>
