@@ -44,7 +44,7 @@ export async function runCommand(
       options.workflowsDir,
       `${workflowName}.yaml`,
     );
-    console.log(chalk.dim(`워크플로우 로드: ${workflowPath}`));
+    console.log(chalk.dim(`Loading workflow: ${workflowPath}`));
     const workflow = await loadWorkflow(workflowPath);
 
     // CLI --model/--effort override
@@ -60,7 +60,7 @@ export async function runCommand(
     try {
       projectConfig = await loadProjectConfig(resolve(options.config));
     } catch {
-      console.log(chalk.dim("프로젝트 설정 없음 — 기본값 사용"));
+      console.log(chalk.dim("No config file -- using defaults"));
     }
 
     // Dry run (입력 불필요)
@@ -83,7 +83,7 @@ export async function runCommand(
     }
 
     if (!input.trim()) {
-      console.error(chalk.red("입력이 비어있습니다. --input 옵션 사용"));
+      console.error(chalk.red("Input is empty. Use --input flag"));
       process.exit(1);
     }
 
@@ -196,7 +196,7 @@ export async function runCommand(
             ? lastSuccessful.output
             : JSON.stringify(lastSuccessful.output, null, 2);
         await writeFile(resolve(options.output), outputStr, "utf-8");
-        console.log(chalk.dim(`\n결과 저장: ${options.output}`));
+        console.log(chalk.dim(`\nResult saved: ${options.output}`));
       }
     }
 
@@ -204,7 +204,7 @@ export async function runCommand(
     if (options.report) {
       const html = renderHTMLReport(result);
       await writeFile(resolve(options.report), html, "utf-8");
-      console.log(chalk.dim(`\n리포트 저장: ${options.report}`));
+      console.log(chalk.dim(`\nReport saved: ${options.report}`));
     }
 
 
@@ -225,14 +225,14 @@ export async function runCommand(
 function printWorkflowStructure(workflow: { name: string; description: string; config: { defaultModel: string; topology: string; onValidationFail: string }; steps: Array<{ id: string; name: string; type: string; dependsOn?: string[]; validation?: { rules: unknown[] }; evaluation?: { enabled: boolean; type: string } }> }): void {
   console.log(chalk.bold(`\n${workflow.name}`));
   console.log(chalk.dim(workflow.description));
-  console.log(chalk.dim(`  모델: ${workflow.config.defaultModel}`));
-  console.log(chalk.dim(`  토폴로지: ${workflow.config.topology}`));
+  console.log(chalk.dim(`  model: ${workflow.config.defaultModel}`));
+  console.log(chalk.dim(`  topology: ${workflow.config.topology}`));
   console.log();
 
   for (const step of workflow.steps) {
-    const deps = step.dependsOn?.join(", ") ?? "없음";
+    const deps = step.dependsOn?.join(", ") ?? "none";
     const hasRules = step.validation?.rules.length
-      ? chalk.green(" [T1:규칙]")
+      ? chalk.green(" [T1:rules]")
       : "";
     const hasEval = step.evaluation?.enabled
       ? chalk.yellow(` [T2:${step.evaluation.type}]`)
@@ -241,12 +241,12 @@ function printWorkflowStructure(workflow: { name: string; description: string; c
     console.log(
       `  ${chalk.cyan(step.id)} — ${step.name} (${step.type})${hasRules}${hasEval}`,
     );
-    console.log(chalk.dim(`    의존: ${deps}`));
+    console.log(chalk.dim(`    deps: ${deps}`));
   }
 }
 
 function printResult(result: WorkflowResult): void {
-  console.log(chalk.bold("\n─── 실행 결과 ───"));
+  console.log(chalk.bold("\n--- Results ---"));
 
   const statusIcon =
     result.status === "success"
@@ -255,19 +255,19 @@ function printResult(result: WorkflowResult): void {
         ? chalk.yellow("⚠ PARTIAL")
         : chalk.red("✗ FAILED");
 
-  console.log(`상태: ${statusIcon}`);
+  console.log(`Status: ${statusIcon}`);
   console.log(
-    `시간: ${(result.totalDurationMs / 1000).toFixed(1)}s`,
+    `Time: ${(result.totalDurationMs / 1000).toFixed(1)}s`,
   );
   console.log(
-    `토큰: ${result.totalTokens.input.toLocaleString()} input + ${result.totalTokens.output.toLocaleString()} output`,
+    `Tokens: ${result.totalTokens.input.toLocaleString()} input + ${result.totalTokens.output.toLocaleString()} output`,
   );
   console.log(
-    `비용 추정: $${result.totalCostEstimate.toFixed(4)}`,
+    `Est. cost: $${result.totalCostEstimate.toFixed(4)}`,
   );
-  console.log(`트레이스 ID: ${result.traceId}`);
+  console.log(`Trace ID: ${result.traceId}`);
 
-  console.log(chalk.dim("\n단계별:"));
+  console.log(chalk.dim("\nSteps:"));
   for (const step of result.steps) {
     const icon =
       step.status === "success"
@@ -291,7 +291,7 @@ function printResult(result: WorkflowResult): void {
     if (step.evaluation && !step.evaluation.passed) {
       console.log(
         chalk.yellow(
-          `    ↳ 평가 점수: ${step.evaluation.score.toFixed(2)} (기준 미달)`,
+          `    ↳ eval score: ${step.evaluation.score.toFixed(2)} (below threshold)`,
         ),
       );
     }

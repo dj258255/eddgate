@@ -8,6 +8,8 @@
 
 Run workflows with validation gates, analyze failures, auto-generate rules, regression test. One CLI, one loop.
 
+> **Coming from Promptfoo?** eddgate closes the loop that Promptfoo left open: failures are analyzed, rules are auto-generated, and applied on the next run. No data sent to any AI provider. Fully self-hosted.
+
 ```
 run -> analyze -> test -> run (improved) -> ...
 ```

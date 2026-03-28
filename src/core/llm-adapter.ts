@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+
 /**
  * LLM Adapter Interface
  *
@@ -203,7 +205,6 @@ export class AnthropicAPIAdapter implements LLMAdapter {
 export function createDefaultAdapter(): LLMAdapter {
   // Check if Claude CLI is available
   try {
-    const { execFileSync } = require("node:child_process");
     execFileSync("claude", ["--version"], {
       encoding: "utf-8",
       timeout: 3000,

@@ -1,3 +1,4 @@
+import { normalizeScore } from "../eval/normalize-score.js";
 import { createInterface } from "node:readline";
 import type {
   WorkflowDefinition,
@@ -541,9 +542,18 @@ function buildWorkflowResult(
   };
 }
 
-function estimateCostFromTokens(inputTokens: number, outputTokens: number): number {
-  // Claude Sonnet 4.6 기준 추정: $3/M input, $15/M output
-  return (inputTokens * 3 + outputTokens * 15) / 1_000_000;
+// Model pricing per million tokens (input/output)
+const MODEL_PRICING: Record<string, [number, number]> = {
+  sonnet: [3, 15],
+  opus: [15, 75],
+  haiku: [0.25, 1.25],
+  "claude-sonnet-4-5": [3, 15],
+  "claude-opus-4-5": [15, 75],
+};
+
+function estimateCostFromTokens(inputTokens: number, outputTokens: number, model?: string): number {
+  const [inputPrice, outputPrice] = MODEL_PRICING[model ?? "sonnet"] ?? [3, 15];
+  return (inputTokens * inputPrice + outputTokens * outputPrice) / 1_000_000;
 }
 
 /**
@@ -559,13 +569,6 @@ function stripCodeBlock(text: string): string {
  * LLM 평가 점수를 0~1 범위로 정규화.
  * LLM이 0~10, 0~100, 또는 1~5 스케일로 줄 수 있음.
  */
-function normalizeScore(score: number): number {
-  if (score >= 0 && score <= 1) return score;
-  if (score > 1 && score <= 5) return score / 5;
-  if (score > 5 && score <= 10) return score / 10;
-  if (score > 10 && score <= 100) return score / 100;
-  return Math.min(1, Math.max(0, score));
-}
 
 /**
  * parallel 토폴로지용: 의존성이 같은 레이어끼리 묶어서 병렬 실행.

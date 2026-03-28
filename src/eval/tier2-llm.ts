@@ -1,3 +1,4 @@
+import { normalizeScore } from "./normalize-score.js";
 import { runEvaluation } from "../core/agent-runner.js";
 import type { TraceEmitter } from "../trace/emitter.js";
 import type { EvaluationResult, LLMEvaluation } from "../types/index.js";
@@ -39,10 +40,3 @@ export async function runTier2Evaluation(options: {
   };
 }
 
-function normalizeScore(score: number): number {
-  if (score >= 0 && score <= 1) return score;
-  if (score > 1 && score <= 5) return score / 5;
-  if (score > 5 && score <= 10) return score / 10;
-  if (score > 10 && score <= 100) return score / 100;
-  return Math.min(1, Math.max(0, score));
-}

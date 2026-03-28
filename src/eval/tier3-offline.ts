@@ -1,3 +1,4 @@
+import { normalizeScore } from "./normalize-score.js";
 import { readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { runEvaluation } from "../core/agent-runner.js";
@@ -155,10 +156,3 @@ function parseJsonl(content: string): TraceEvent[] {
     .filter((e): e is TraceEvent => e !== null);
 }
 
-function normalizeScore(score: number): number {
-  if (score >= 0 && score <= 1) return score;
-  if (score > 1 && score <= 5) return score / 5;
-  if (score > 5 && score <= 10) return score / 10;
-  if (score > 10 && score <= 100) return score / 100;
-  return Math.min(1, Math.max(0, score));
-}

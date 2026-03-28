@@ -72,7 +72,7 @@ export function buildContext(
  */
 function summarizeOutput(stepId: string, output: unknown): string {
   if (output === null || output === undefined) {
-    return `[${stepId}]: (출력 없음)`;
+    return `[${stepId}]: (no output)`;
   }
 
   const str = typeof output === "string" ? output : JSON.stringify(output);
@@ -123,14 +123,14 @@ export function buildSystemPrompt(
   // 제약 조건
   if (context.identity.constraints.length > 0) {
     parts.push(
-      "## 제약 조건\n" +
+      "## Constraints\n" +
         context.identity.constraints.map((c) => `- ${c}`).join("\n"),
     );
   }
 
   // 이전 단계 컨텍스트 (있으면)
   if (context.memory?.summary) {
-    parts.push("## 이전 단계 결과 요약\n" + context.memory.summary);
+    parts.push("## Previous Step Summary\n" + context.memory.summary);
   }
 
   return parts.join("\n\n");
