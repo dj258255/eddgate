@@ -20,42 +20,48 @@ import { testCommand } from "./commands/test.js";
 import { tuilauncher } from "./tui-launcher.js";
 import { setEffort } from "../core/agent-runner.js";
 
-// No args = TUI mode
+// No args = blessed TUI mode
 if (process.argv.length <= 2) {
-  launchTUI();
+  import("./blessed-tui.js").then((m) => m.launchBlessedTUI()).catch(() => {
+    // Fallback to clack TUI if blessed fails
+    launchTUI();
+  });
 } else {
   launchCLI();
 }
 
 async function launchTUI(): Promise<void> {
   const p = await import("@clack/prompts");
+  const { initLang, t } = await import("../i18n/index.js");
+
+  initLang();
 
   p.intro(chalk.yellow("<|>") + " " + chalk.bold("eddgate"));
 
   // Main loop -- Esc/cancel returns to menu, "exit" quits
   while (true) {
     const mode = await p.select({
-      message: "What do you want to do?",
+      message: t("menu.whatToDo"),
       options: [
-        { value: "run", label: "Run a workflow", hint: "execute with eval gates" },
-        { value: "analyze", label: "Analyze failures", hint: "find patterns, generate rules" },
-        { value: "test", label: "Regression test", hint: "snapshot/diff behavior" },
-        { value: "mcp", label: "MCP servers", hint: "add, remove, list" },
-        { value: "config", label: "Settings", hint: "model, traces, budget" },
-        { value: "exit", label: "Exit" },
+        { value: "run", label: t("menu.run"), hint: t("menu.runHint") },
+        { value: "analyze", label: t("menu.analyze"), hint: t("menu.analyzeHint") },
+        { value: "test", label: t("menu.test"), hint: t("menu.testHint") },
+        { value: "mcp", label: t("menu.mcp"), hint: t("menu.mcpHint") },
+        { value: "config", label: t("menu.config"), hint: t("menu.configHint") },
+        { value: "exit", label: t("menu.exit") },
       ],
     });
 
     if (p.isCancel(mode) || mode === "exit") {
-      p.outro(chalk.dim("bye"));
+      p.outro(chalk.dim(t("menu.bye")));
       process.exit(0);
     }
 
     if (mode === "analyze") {
-      const contextMode = await p.confirm({ message: "Context window profiler mode?" });
-      if (p.isCancel(contextMode)) continue; // back to menu
+      const contextMode = await p.confirm({ message: t("analyze.contextMode") });
+      if (p.isCancel(contextMode)) continue;
 
-      const genRules = await p.confirm({ message: "Auto-generate validation rules?" });
+      const genRules = await p.confirm({ message: t("analyze.generateRules") });
       if (p.isCancel(genRules)) continue;
 
       await analyzeCommand({
@@ -69,12 +75,12 @@ async function launchTUI(): Promise<void> {
 
     if (mode === "test") {
       const action = await p.select({
-        message: "Test action",
+        message: t("test.action"),
         options: [
-          { value: "snapshot", label: "Save snapshot", hint: "capture current behavior as baseline" },
-          { value: "diff", label: "Run diff", hint: "compare against baseline" },
-          { value: "list", label: "List snapshots" },
-          { value: "back", label: "Back" },
+          { value: "snapshot", label: t("test.snapshot"), hint: t("test.snapshotHint") },
+          { value: "diff", label: t("test.diff"), hint: t("test.diffHint") },
+          { value: "list", label: t("test.listSnapshots") },
+          { value: "back", label: t("menu.back") },
         ],
       });
       if (p.isCancel(action) || action === "back") continue;

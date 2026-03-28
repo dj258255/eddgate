@@ -19,76 +19,16 @@ export interface LaunchResult {
   cancelled: boolean;
 }
 
-type Lang = "ko" | "en";
-
-const t: Record<Lang, Record<string, string>> = {
-  ko: {
-    subtitle: "평가 게이트 워크플로우 엔진",
-    workflow: "워크플로우를 선택하세요",
-    input: "입력 (텍스트 또는 파일 경로)",
-    model: "모델을 선택하세요",
-    effort: "정밀도를 선택하세요",
-    budget: "최대 예산 USD (건너뛰려면 엔터)",
-    reportPath: "HTML 리포트 경로 (건너뛰려면 엔터)",
-    tracePath: "JSONL 트레이스 경로 (건너뛰려면 엔터)",
-    confirm: "실행하시겠습니까?",
-    noWorkflows: "워크플로우가 없습니다. eddgate init을 실행하세요.",
-    cancelled: "취소되었습니다.",
-    running: "워크플로우 실행 중...",
-    done: "완료!",
-    sonnet: "균형 (기본)",
-    opus: "최고 성능",
-    haiku: "빠르고 저렴",
-    low: "빠르게",
-    medium: "표준 (기본)",
-    high: "꼼꼼하게",
-    max: "최대 품질",
-  },
-  en: {
-    subtitle: "Evaluation-gated workflow engine",
-    workflow: "Select a workflow",
-    input: "Input (text or file path)",
-    model: "Select a model",
-    effort: "Select effort level",
-    budget: "Max budget USD (enter to skip)",
-    reportPath: "HTML report path (enter to skip)",
-    tracePath: "JSONL trace path (enter to skip)",
-    confirm: "Run this workflow?",
-    noWorkflows: "No workflows found. Run: eddgate init",
-    cancelled: "Cancelled.",
-    running: "Running workflow...",
-    done: "Done!",
-    sonnet: "Balanced (default)",
-    opus: "Most capable",
-    haiku: "Fast and cheap",
-    low: "Quick",
-    medium: "Standard (default)",
-    high: "Thorough",
-    max: "Maximum quality",
-  },
-};
-
 export async function tuilauncher(): Promise<LaunchResult> {
   const cancelled = (): LaunchResult => ({
     workflow: "", input: "", model: "sonnet", effort: "medium", thinking: "disabled",
     workflowsDir: ".", promptsDir: ".", cancelled: true,
   });
 
-  p.intro(chalk.bold("eddgate"));
+  const { initLang, t: tr, getLang } = await import("../i18n/index.js");
+  initLang();
 
-  // Language
-  const lang = (await p.select({
-    message: "Language",
-    options: [
-      { value: "ko", label: "한국어" },
-      { value: "en", label: "English" },
-    ],
-  })) as Lang;
-
-  if (p.isCancel(lang)) { p.cancel(t.en.cancelled); return cancelled(); }
-  const l = t[lang];
-
-  p.note(l.subtitle);
+  const lang = getLang();
 
   // Find workflows
   const workflowsDir = resolve("./workflows");
@@ -100,57 +40,57 @@ export async function tuilauncher(): Promise<LaunchResult> {
     wfDir = templateDir;
   }
   if (workflows.length === 0) {
-    p.cancel(l.noWorkflows);
+    p.cancel(tr("run.noWorkflows"));
     return cancelled();
   }
 
   // Workflow
   const workflow = await p.select({
-    message: l.workflow,
+    message: tr("run.workflow"),
     options: workflows.map((wf) => ({ value: wf, label: wf })),
   });
-  if (p.isCancel(workflow)) { p.cancel(l.cancelled); return cancelled(); }
+  if (p.isCancel(workflow)) { p.cancel(tr("run.cancelled")); return cancelled(); }
 
   // Input method
   const inputMethod = await p.select({
-    message: lang === "ko" ? "입력 방식" : "Input method",
+    message: tr("run.inputMethod"),
     options: [
-      { value: "file", label: lang === "ko" ? "파일 선택" : "Select file" },
-      { value: "text", label: lang === "ko" ? "직접 입력" : "Type text" },
+      { value: "file", label: tr("run.selectFile") },
+      { value: "text", label: tr("run.typeText") },
     ],
   });
-  if (p.isCancel(inputMethod)) { p.cancel(l.cancelled); return cancelled(); }
+  if (p.isCancel(inputMethod)) { p.cancel(tr("run.cancelled")); return cancelled(); }
 
   let input: string | symbol;
 
   if (inputMethod === "file") {
     const filePath = await pickFile(".", lang);
-    if (!filePath) { p.cancel(l.cancelled); return cancelled(); }
+    if (!filePath) { p.cancel(tr("run.cancelled")); return cancelled(); }
     input = filePath;
-    p.log.info(`${lang === "ko" ? "선택됨" : "Selected"}: ${filePath}`);
+    p.log.info(`${tr("run.selected")}: ${filePath}`);
   } else {
     input = await p.text({
-      message: l.input,
-      validate: (val) => (val?.trim() ? undefined : l.input),
+      message: tr("run.input"),
+      validate: (val) => (val?.trim() ? undefined : tr("run.input")),
     });
   }
-  if (p.isCancel(input)) { p.cancel(l.cancelled); return cancelled(); }
+  if (p.isCancel(input)) { p.cancel(tr("run.cancelled")); return cancelled(); }
 
   // Model
   const isKo = lang === "ko";
   const model = await p.select({
-    message: l.model,
+    message: tr("run.model"),
     options: MODELS.map((m) => ({
       value: m.value,
       label: m.label,
       hint: isKo ? m.hintKo : m.hint,
     })),
   });
-  if (p.isCancel(model)) { p.cancel(l.cancelled); return cancelled(); }
+  if (p.isCancel(model)) { p.cancel(tr("run.cancelled")); return cancelled(); }
 
   // Effort
   const effort = await p.select({
-    message: l.effort,
+    message: tr("run.effort"),
     options: EFFORTS.map((e) => ({
       value: e.value,
       label: e.label,
@@ -158,11 +98,11 @@ export async function tuilauncher(): Promise<LaunchResult> {
     })),
     initialValue: "medium",
   });
-  if (p.isCancel(effort)) { p.cancel(l.cancelled); return cancelled(); }
+  if (p.isCancel(effort)) { p.cancel(tr("run.cancelled")); return cancelled(); }
 
   // Extended Thinking
   const thinking = await p.select({
-    message: isKo ? "확장 사고" : "Extended thinking",
+    message: tr("run.thinking"),
     options: THINKING_OPTIONS.map((t) => ({
       value: t.value,
       label: t.label,
@@ -170,22 +110,22 @@ export async function tuilauncher(): Promise<LaunchResult> {
     })),
     initialValue: "disabled",
   });
-  if (p.isCancel(thinking)) { p.cancel(l.cancelled); return cancelled(); }
+  if (p.isCancel(thinking)) { p.cancel(tr("run.cancelled")); return cancelled(); }
 
   // Optional settings
-  const budget = await p.text({ message: l.budget, defaultValue: "" });
-  if (p.isCancel(budget)) { p.cancel(l.cancelled); return cancelled(); }
+  const budget = await p.text({ message: tr("run.budget"), defaultValue: "" });
+  if (p.isCancel(budget)) { p.cancel(tr("run.cancelled")); return cancelled(); }
 
-  const report = await p.text({ message: l.reportPath, defaultValue: "" });
-  if (p.isCancel(report)) { p.cancel(l.cancelled); return cancelled(); }
+  const report = await p.text({ message: tr("run.reportPath"), defaultValue: "" });
+  if (p.isCancel(report)) { p.cancel(tr("run.cancelled")); return cancelled(); }
 
-  const trace = await p.text({ message: l.tracePath, defaultValue: "" });
-  if (p.isCancel(trace)) { p.cancel(l.cancelled); return cancelled(); }
+  const trace = await p.text({ message: tr("run.tracePath"), defaultValue: "" });
+  if (p.isCancel(trace)) { p.cancel(tr("run.cancelled")); return cancelled(); }
 
   // Confirm
-  const confirmed = await p.confirm({ message: l.confirm });
+  const confirmed = await p.confirm({ message: tr("run.confirm") });
   if (p.isCancel(confirmed) || !confirmed) {
-    p.cancel(l.cancelled);
+    p.cancel(tr("run.cancelled"));
     return cancelled();
   }
 
