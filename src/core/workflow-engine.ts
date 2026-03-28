@@ -172,6 +172,7 @@ async function executeStep(
   rolePrompt: string | undefined,
   tracer: TraceEmitter,
   modelOverrides?: { classify?: string; generate?: string; validate?: string },
+  _isRetry = false, // true = inside retryStep, skip nested retries
 ): Promise<StepResult> {
   const stepStart = performance.now();
   const context = buildContext(step, previousResults, defaultModel, modelOverrides);
@@ -308,8 +309,8 @@ async function executeStep(
       tracer.evaluation(step.id, evaluationResult);
 
       if (!evaluationResult.passed) {
-        // retry 로직
-        if (step.evaluation.onFail === "retry") {
+        // retry 로직 (재시도 안에서는 재시도 안 함 -- 무한 루프 방지)
+        if (step.evaluation.onFail === "retry" && !_isRetry) {
           const retried = await retryStep(
             step,
             originalInput,
@@ -436,6 +437,8 @@ async function retryStep(
       defaultModel,
       rolePrompt,
       tracer,
+      undefined, // modelOverrides
+      true, // _isRetry = true -- no nested retries
     );
 
     if (result.status === "success" || result.status === "flagged") {

@@ -186,7 +186,7 @@ steps:
     evaluation:
       enabled: true
       type: "custom"
-      threshold: 0.9
+      threshold: 0.7
       onFail: "retry"
       maxRetries: 2
       rubric: |

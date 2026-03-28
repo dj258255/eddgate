@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>eddgate Report — eddgate 문서 파이프라인</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-dim: #7d8590;
+  --green: #3fb950;
+  --yellow: #d29922;
+  --red: #f85149;
+  --blue: #58a6ff;
+  --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+  --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+header {
+  margin-bottom: 2rem;
+}
+
+header h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.dim { color: var(--text-dim); }
+
+.badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: var(--mono);
+}
+
+.status-success { background: #1a3a2a; color: var(--green); }
+.status-warn { background: #3a2a1a; color: var(--yellow); }
+.status-fail { background: #3a1a1a; color: var(--red); }
+.status-dim { background: var(--surface); color: var(--text-dim); }
+
+/* ─── Summary Stats ─── */
+.summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-family: var(--mono);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-top: 0.25rem;
+}
+
+/* ─── Steps ─── */
+.steps h2 {
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  color: var(--text-dim);
+}
+
+.step {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+
+.step.failed { border-color: var(--red); }
+.step.flagged { border-color: var(--yellow); }
+
+.step summary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  list-style: none;
+}
+
+.step summary::-webkit-details-marker { display: none; }
+
+.step summary::before {
+  content: '\25B6';
+  font-size: 0.625rem;
+  transition: transform 0.2s;
+  color: var(--text-dim);
+}
+
+.step[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.step-icon {
+  font-size: 1rem;
+  width: 1.25rem;
+  text-align: center;
+}
+
+.step.success .step-icon { color: var(--green); }
+.step.flagged .step-icon { color: var(--yellow); }
+.step.failed .step-icon { color: var(--red); }
+.step.skipped .step-icon { color: var(--text-dim); }
+
+.step-name {
+  font-weight: 500;
+  flex: 1;
+}
+
+.step-meta {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.step-detail {
+  padding: 0 1rem 1rem;
+  border-top: 1px solid var(--border);
+}
+
+/* ─── Eval Bar ─── */
+.eval-badge {
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 3px;
+}
+
+.eval-pass { background: #1a3a2a; color: var(--green); }
+.eval-fail { background: #3a1a1a; color: var(--red); }
+
+.eval-detail {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: var(--bg);
+  border-radius: 6px;
+}
+
+.eval-header {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-bottom: 0.5rem;
+}
+
+.eval-bar-container {
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.eval-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+.bar-pass { background: var(--green); }
+.bar-fail { background: var(--red); }
+
+.eval-score {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  color: var(--text-dim);
+}
+
+.eval-reasoning {
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+/* ─── Validation Failures ─── */
+.validation-failures {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: #1a0a0a;
+  border: 1px solid #3a1a1a;
+  border-radius: 6px;
+}
+
+.fail-header {
+  font-size: 0.75rem;
+  color: var(--red);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.validation-failures ul {
+  list-style: none;
+  font-size: 0.8125rem;
+}
+
+.validation-failures li::before {
+  content: '\2717 ';
+  color: var(--red);
+}
+
+/* ─── Token Breakdown ─── */
+.token-breakdown {
+  margin-top: 0.75rem;
+}
+
+.token-breakdown table {
+  font-size: 0.75rem;
+  font-family: var(--mono);
+}
+
+.token-breakdown th {
+  color: var(--text-dim);
+  text-align: left;
+  padding-right: 1rem;
+  font-weight: 400;
+}
+
+/* ─── Output ─── */
+.output {
+  margin-top: 0.75rem;
+}
+
+.output-header {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-bottom: 0.25rem;
+}
+
+.output pre {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem;
+  overflow-x: auto;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.output code {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ─── Trace Download ─── */
+.trace-download {
+  margin-top: 2rem;
+}
+
+.trace-download h2 {
+  font-size: 1rem;
+  margin-bottom: 0.75rem;
+  color: var(--text-dim);
+}
+
+.trace-download button {
+  background: var(--surface);
+  color: var(--blue);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  font-family: var(--sans);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.trace-download button:hover {
+  background: var(--border);
+}
+
+/* ─── Footer ─── */
+footer {
+  margin-top: 3rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.75rem;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 640px) {
+  .summary { grid-template-columns: repeat(2, 1fr); }
+  .step summary { flex-wrap: wrap; }
+  .step-meta { width: 100%; margin-top: 0.25rem; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>eddgate 실행 리포트</h1>
+    <div class="meta">
+      <span class="badge status-success">SUCCESS</span>
+      <span>eddgate 문서 파이프라인</span>
+      <span class="dim">Trace: e817a795...</span>
+    </div>
+  </header>
+
+  <section class="summary">
+    <div class="stat">
+      <div class="stat-value">3723.0s</div>
+      <div class="stat-label">총 시간</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">29,812</div>
+      <div class="stat-label">총 토큰</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">$0.3713</div>
+      <div class="stat-label">비용 추정</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">8</div>
+      <div class="stat-label">단계</div>
+    </div>
+  </section>
+
+  <section class="steps">
+    <h2>단계별 결과</h2>
+    
+    <details class="step success" >
+      <summary>
+        <span class="step-icon">&#x2713;</span>
+        <span class="step-name">Step 1: classify</span>
+        <span class="step-meta">
+          8.1s
+          · 1,114 tok
+          
+        </span>
+        <span class="badge status-success">success</span>
+      </summary>
+      <div class="step-detail">
+        
+        
+        
+    <div class="token-breakdown">
+      <table>
+        <tr><th>Input</th><td>896</td></tr>
+        <tr><th>Output</th><td>218</td></tr>
+        <tr><th>시간</th><td>8.1s</td></tr>
+      </table>
+    </div>
+        
+    <div class="output">
+      <div class="output-header">출력 </div>
+      <pre><code>{
+  &quot;topics&quot;: [
+    &quot;1. Microsoft Teams 게스트 사용자 개요 및 권한 범위&quot;,
+    &quot;2. 게스트 사용자 초대 및 추가 방법&quot;,
+    &quot;3. 게스트 사용자 권한 설정 및 제한 구성&quot;,
+    &quot;4. 조직 수준 게스트 액세스 정책 관리 (Azure AD / Entra ID)&quot;,
+    &quot;5. 팀별 게스트 권한 세부 조정 방법&quot;
+  ],
+  &quot;original_summary&quot;: &quot;Microsoft Teams에서 게스트 사용자를 초대하고 해당 게스트의 권한을 설정하는 방법에 대한 문의입니다.&quot;
+}</code></pre>
+    </div>
+      </div>
+    </details>
+
+    <details class="step success" >
+      <summary>
+        <span class="step-icon">&#x2713;</span>
+        <span class="step-name">Step 2: retrieve</span>
+        <span class="step-meta">
+          57.3s
+          · 4,590 tok
+          
+        </span>
+        <span class="badge status-success">success</span>
+      </summary>
+      <div class="step-detail">
+        
+        
+        
+    <div class="token-breakdown">
+      <table>
+        <tr><th>Input</th><td>935</td></tr>
+        <tr><th>Output</th><td>3,655</td></tr>
+        <tr><th>시간</th><td>57.3s</td></tr>
+      </table>
+    </div>
+        
+    <div class="output">
+      <div class="output-header">출력 (3,772자 중 2,000자)</div>
+      <pre><code>P1: Microsoft Teams 게스트 사용자 개요 및 권한 범위
+
+- Guest access in Microsoft Teams (개요·활성화·권한 범위 전반 DIRECT)
+- https://learn.microsoft.com/en-us/microsoftteams/guest-access
+
+- Guest experience in Microsoft Teams (게스트 관점 기능 범위 DIRECT)
+- https://learn.microsoft.com/en-us/microsoftteams/guest-experience
+
+- Team owner, member, and guest capabilities in Microsoft Teams (역할별 권한 비교표 DIRECT)
+- https://support.microsoft.com/en-us/office/team-owner-member-and-guest-capabilities-in-microsoft-teams-d03fdf5b-1a6e-48e4-8e07-b13e1350ec7b
+
+- Use guest access and external access to collaborate with people outside your organization (게스트 vs 외부 액세스 범위 구분 PARTIAL)
+- https://learn.microsoft.com/en-us/microsoftteams/communicate-with-users-from-other-organizations
+
+
+P2: 게스트 사용자 초대 및 추가 방법
+
+- Add guests to a team in Microsoft Teams (팀에 게스트 추가 단계별 절차 DIRECT)
+- https://support.microsoft.com/en-us/office/add-guests-to-a-team-in-microsoft-teams-fccb4fa6-f864-4508-bdde-256e7384a14f
+
+- Add your clients as guests in Microsoft Teams (클라이언트 게스트 초대 시나리오 DIRECT)
+- https://support.microsoft.com/en-us/office/add-your-clients-as-guests-in-microsoft-teams-db788a48-e093-4466-ac49-530979642d54
+
+- Turn guest access in Microsoft Teams on or off (초대 전 선행 설정 활성화 PARTIAL)
+- https://learn.microsoft.com/en-us/microsoftteams/set-up-guests
+
+- Collaborate with guests in a team — IT Admins (IT 관리자 게스트 협업 구성 가이드 PARTIAL)
+- https://learn.microsoft.com/en-us/microsoft-365/solutions/collaborate-as-team?view=o365-worldwide
+
+
+P3: 게스트 사용자 권한 설정 및 제한 구성
+
+- Turn guest access in Microsoft Teams on or off (Admin Center 권한 항목별 On/Off 구성 DIRECT)
+- https://learn.microsoft.com/en-us/microsoftteams/set-up-guests
+
+- Set guest permissions for channels in Microsoft Teams (채널 수준 게스트 권한 설정 DIRECT)
+- https://support.microsoft.com/en-us/office/set-guest-permissions-for-channels-in-microsoft-teams-4756c468-2746-4bfd-a582-736d55fcc169
+
+- Guest access in Microsoft Teams (통화·회의·메시지 권한 설정 항목 상세 PARTIAL)
+- https://learn.microsoft.com/en-us/microsoftteams/g
+
+... (truncated)</code></pre>
+    </div>
+      </div>
+    </details>
+
+    <details class="step success" >
+      <summary>
+        <span class="step-icon">&#x2713;</span>
+        <span class="step-name">Step 3: generate_taxonomy</span>
+        <span class="step-meta">
+          58.0s
+          · 3,831 tok
+          
+        </span>
+        <span class="badge status-success">success</span>
+      </summary>
+      <div class="step-detail">
+        
+        
+        
+    <div class="token-breakdown">
+      <table>
+        <tr><th>Input</th><td>3</td></tr>
+        <tr><th>Output</th><td>3,828</td></tr>
+        <tr><th>시간</th><td>58.0s</td></tr>
+      </table>
+    </div>
+        
+    <div class="output">
+      <div class="output-header">출력 (4,942자 중 2,000자)</div>
+      <pre><code>## ISSUE_BRIEF
+
+### P1 — Microsoft Teams 게스트 사용자 개요 및 권한 범위
+
+- 문제 핵심: 게스트 사용자가 무엇인지, 일반 멤버/외부 액세스와 어떻게 다른지, 기본으로 허용되는 기능 범위가 무엇인지 정의가 필요하다.
+- 답변에 필요한 하위 질문:
+  1. 게스트 사용자의 정의 및 계정 요건(Microsoft 계정 필요 여부 등)은?
+  2. 게스트 액세스와 외부 액세스(federated access)의 차이는?
+  3. 게스트가 기본적으로 할 수 있는 행동(채팅, 회의, 파일 등)은?
+  4. 게스트가 기본적으로 할 수 없는 행동(조직 디렉터리 검색 등)은?
+  5. 팀 소유자·멤버·게스트 간 권한 차이의 요약 비교는?
+  6. 게스트 액세스가 활성화되기 위한 전제 조건(테넌트 설정)은?
+- 필요한 근거 유형: 제품 기능 정의, 역할별 권한 비교표, 제한사항
+- 잠정 답변 재료:
+  - guest-access (개요·권한 범위 전반) — DIRECT
+  - guest-experience (게스트 관점 기능 목록) — DIRECT
+  - team-owner-member-guest-capabilities (역할 비교표) — DIRECT
+  - communicate-with-users-from-other-organizations (게스트 vs 외부 액세스 구분) — PARTIAL
+
+---
+
+### P2 — 게스트 사용자 초대 및 추가 방법
+
+- 문제 핵심: 팀 소유자 또는 관리자가 외부인을 게스트로 초대하는 절차와, 초대 전 필요한 선행 설정이 무엇인지 순서대로 제시해야 한다.
+- 답변에 필요한 하위 질문:
+  1. 게스트 초대 전 관리자가 반드시 활성화해야 하는 설정 항목은?
+  2. 팀 소유자가 Teams UI에서 게스트를 추가하는 단계별 절차는?
+  3. 초대 이메일 수신 후 게스트가 수행해야 하는 단계는?
+  4. 클라이언트(외부 파트너 등) 초대 시나리오에서 추가로 고려할 사항은?
+  5. IT 관리자가 관리 센터에서 게스트를 직접 추가하는 방법은?
+  6. 초대 가능한 이메일 계정 유형의 제약(Gmail, 개인 계정 등)은?
+- 필요한 근거 유형: 절차(step-by-step), 선행 조건(정책/설정), 제한사항
+- 잠정 답변 재료:
+  - add-guests-to-a-team (단계별 절차) — DIRECT
+  - add-your-clients-as-guests (클라이언트 시나리오) — DIRECT
+  - set-up-guests (선행 설정 활성화) — PARTIAL
+  - collaborate-as-team IT Admins (관리자 구성 가이드) — PARTIAL
+  - 게스트가 초대 수락 후 수행하는 단계 — 근거 부족 (guest-experience에서 보완 필요)
+
+---
+
+### P3 — 게스트 사용자 권한 설정 및 제한 구성
+
+- 문제 핵심: Teams 관리자가 Admin Center에서 게스트의 기능별 권한(통화, 회의, 메시지 등)을 항목 단위로 On/Off 하는 방법과, 채널 수준 권한 제한 구성 방법을 다루어야 한다.
+- 답변에 필요한 하위 질문:
+  1. Teams Admin Center에서 조정 가능한 게스트 권한 항목 전체 목록은?
+  2. 통화·회의 관련 게스트 권한 설정 항목과 기본값은?
+  3. 메시지 관련 게스트 권한 설정 항목과 기본값은?
+  4. 채널 생성·삭제 등 채널 수준 게스트 권한은 어디서 설정하는가?
+  5. Admin Center 권한 설정과 팀 소유자 채널 권한 설정의 우선순위 관계는?
+- 필요한 근거 유형: 제품 기능(설정 항목 목록), 절차, 정책 우선순위
+- 잠정 답변 재료:
+  - set-up-guests (Admin Center 항목별 On/Off) — DIRECT
+  - set-guest-permissions-for-channels (채널 수준 설정) — DIRECT
+  - guest-access (통화·회의·메시지 권한 상세) — PARTIAL
+  - Admin Center 설정 vs 팀 소유자 설정 우선순위 
+
+... (truncated)</code></pre>
+    </div>
+      </div>
+    </details>
+
+    <details class="step success" >
+      <summary>
+        <span class="step-icon">&#x2713;</span>
+        <span class="step-name">Step 4: generate_flow</span>
+        <span class="step-meta">
+          52.4s
+          · 3,408 tok
+          
+        </span>
+        <span class="badge status-success">success</span>
+      </summary>
+      <div class="step-detail">
+        
+        
+        
+    <div class="token-breakdown">
+      <table>
+        <tr><th>Input</th><td>3</td></tr>
+        <tr><th>Output</th><td>3,405</td></tr>
+        <tr><th>시간</th><td>52.4s</td></tr>
+      </table>
+    </div>
+        
+    <div class="output">
+      <div class="output-header">출력 (4,165자 중 2,000자)</div>
+      <pre><code>## ANSWER_DRAFT_V1
+
+---
+
+### P1 — Microsoft Teams 게스트 사용자 개요 및 권한 범위
+
+**결론**
+게스트 사용자는 조직 외부인에게 Teams 팀 단위 협업 권한을 부여하는 역할로, 외부 액세스(federated access)와 달리 팀 내 채널·파일·채팅에 직접 참여할 수 있다.
+
+**근거**
+- 정의: 게스트는 조직의 Azure AD(Entra ID) 디렉터리에 게스트 계정으로 등록되는 외부인이다. Microsoft 계정 또는 조직 계정이 필요하다.
+- 게스트 vs 외부 액세스 구분: 외부 액세스(federated)는 1:1 채팅·통화만 가능하고 팀 내부 채널에는 접근할 수 없다. 게스트 액세스는 초대된 팀의 채널, 파일, 회의에 참여 가능하다.
+- 게스트가 기본적으로 할 수 있는 것: 채널 메시지 읽기·작성, 채팅, 회의 참여, 파일 공유 및 접근.
+- 게스트가 기본적으로 할 수 없는 것: 조직 디렉터리 검색, 다른 팀 검색·참여, 관리 기능 접근.
+- 역할 비교: 팀 소유자 &gt; 멤버 &gt; 게스트 순으로 권한이 좁아진다. 세부 항목은 `team-owner-member-guest-capabilities` 비교표에서 확인 가능하다.
+
+**조건/예외**
+- 게스트 액세스는 테넌트 수준에서 관리자가 활성화해야 사용 가능하다. 기본값은 조직 설정에 따라 다를 수 있다.
+- 출처: `guest-access`, `guest-experience`, `team-owner-member-guest-capabilities` — DIRECT; `communicate-with-users-from-other-organizations` — PARTIAL.
+
+**권장 액션**
+- 역할 비교표를 P5 답변과 연결하여 중복 서술을 방지한다. 개요 비교는 P1, 팀 소유자 조정 가능 항목 상세는 P5로 분리한다.
+
+---
+
+### P2 — 게스트 사용자 초대 및 추가 방법
+
+**결론**
+게스트 초대는 관리자의 선행 설정 활성화 → 팀 소유자의 UI 초대 → 게스트의 초대 수락 순으로 진행된다.
+
+**근거**
+- 선행 설정: 관리자는 Teams Admin Center에서 게스트 액세스를 활성화해야 한다(`set-up-guests`).
+- 팀 소유자 초대 절차: Teams UI에서 팀 이름 선택 → 멤버 추가 → 외부 이메일 입력 → 게스트로 추가 (`add-guests-to-a-team`).
+- 클라이언트 초대 시나리오: 외부 파트너 초대 시 추가 고려 사항이 있다(`add-your-clients-as-guests`).
+- 관리자 직접 추가: IT 관리자는 관리 센터에서 게스트 계정을 직접 추가할 수 있다(`collaborate-as-team IT Admins`).
+
+**조건/예외**
+- 게스트가 초대 이메일 수락 후 거치는 리딤(redemption) 프로세스 단계는 현재 수집된 출처에 명시적 설명이 없다. `guest-experience`로 보완 필요.
+- 초대 가능한 이메일 계정 유형 제약(Gmail, 개인 Microsoft 계정 등)에 대한 출처가 현재 없다.
+
+**추가 확인 질문**
+- 게스트가 초대 수락 후 처음 Teams에 접속하기까지 거치는 단계(리딤 프로세스)를 `guest-experience`에서 확인할 수 있는가?
+- Gmail 등 비Microsoft 계정으로의 초대 가능 여부를 명시하는 출처가 있는가?
+
+---
+
+### P3 — 게스트 사용자 권한 설정 및 제한 구성
+
+**결론**
+Teams Admin Center에서 게스트의 통화·회의·메시지 권한을 항목 단위로 On/Off 하며, 채널 수준 권한은 별도 설정 경로에서 구성한다.
+
+**근거**
+- Admin Center 권한 항목: 통화, 회의, 메시지 영역별로 On/Off 토글이 제공된다. 각 항목의 기본값은 `set-up-guests` 문서에서 확인 가능하다.
+- 채널 수준 설정: 채널 생성·삭제 등 채널 단위 게스트 권한은 `set-guest-permissions-for-channels`에서 구성한다.
+- 통화·회의·메시지 권한 상세는
+
+... (truncated)</code></pre>
+    </div>
+      </div>
+    </details>
+
+    <details class="step success" >
+      <summary>
+        <span class="step-icon">&#x2713;</span>
+        <span class="step-name">Step 5: generate_citation</span>
+        <span class="step-meta">
+          122.7s
+          · 6,911 tok
+          <span class="eval-badge eval-pass">0.78</span>
+        </span>
+        <span class="badge status-success">success</span>
+      </summary>
+      <div class="step-detail">
+        
+        
+    <div class="eval-detail">
+      <div class="eval-header">LLM 평가 (flag)</div>
+      <div class="eval-bar-container">
+        <div class="eval-bar bar-pass" style="width: 78%"></div>
+      </div>
+      <div class="eval-score">0.78 / 1.00</div>
+      <div class="eval-reasoning">The text cites 13 specific Microsoft Learn documentation URLs and maps each claim to numbered references. Positive indicators: (1) all cited URLs correspond to real, identifiable Microsoft Learn pages with slugs that match the claimed content (e.g., guest-access, set-up-guests, add-guests-to-a-team); (2) the factual claims align with known Microsoft Teams documentation content; (3) the author explicitly flags where source support is absent, using hedged language such as 'not explicitly stated in available sources' and 'defer this claim' — demonstrating disciplined groundedness rather than fabrication; (4) PARTIAL-rated citations [4][12] are appropriately scoped. Deductions: (1) the actual text of the cited documents is not provided as evidence in this evaluation context, so direct cross-verification is impossible; (2) two sources are rated PARTIAL, meaning claims derived from them are only partially supported; (3) the three-tier priority chain (Entra ID → Teams Admin Center → team owner) is explicitly noted as lacking a unified source, which is a known gap; (4) minor risk of claim drift when the same source [8] is applied to two different contexts (P3 admin view and P5 owner view) without granular sub-citation. Overall, the text demonstrates careful citation discipline and appropriate hedging, warranting a high but not perfect groundedness score.</div>
+    </div>
+        
+    <div class="token-breakdown">
+      <table>
+        <tr><th>Input</th><td>3</td></tr>
+        <tr><th>Output</th><td>6,908</td></tr>
+        <tr><th>시간</th><td>122.7s</td></tr>
+      </table>
+    </div>
+        
+    <div class="output">
+      <div class="output-header">출력 </div>
+      <pre><code>(1) https://learn.microsoft.com/en-us/microsoftteams/guest-access
+(2) https://learn.microsoft.com/en-us/microsoftteams/guest-experience
+(3) https://learn.microsoft.com/en-us/microsoftteams/team-owner-member-guest-capabilities
+(4) https://learn.microsoft.com/en-us/microsoftteams/communicate-with-users-from-other-organizations
+(5) https://learn.microsoft.com/en-us/microsoftteams/set-up-guests
+(6) https://learn.microsoft.com/en-us/microsoftteams/add-guests-to-a-team
+(7) https://learn.microsoft.com/en-us/microsoft-365/solutions/collaborate-as-team
+(8) https://learn.microsoft.com/en-us/microsoftteams/set-guest-permissions-for-channels
+(9) https://learn.microsoft.com/en-us/entra/identity/users/users-restrict-guest-permissions
+(10) https://learn.microsoft.com/en-us/entra/external-id/external-collaboration-settings-configure
+(11) https://learn.microsoft.com/en-us/microsoft-365/admin/add-users/about-guest-users
+(12) https://learn.microsoft.com/en-us/microsoft-365/solutions/secure-teams-security-isolation
+(13) https://learn.microsoft.com/en-us/microsoftteams/manage-teams-in-modern-portal</code></pre>
+    </div>
+      </div>
+    </details>
+
+    <details class="step success" >
+      <summary>
+        <span class="step-icon">&#x2713;</span>
+        <span class="step-name">Step 6: structure</span>
+        <span class="step-meta">
+          47.4s
+          · 5,620 tok
+          
+        </span>
+        <span class="badge status-success">success</span>
+      </summary>
+      <div class="step-detail">
+        
+        
+        
+    <div class="token-breakdown">
+      <table>
+        <tr><th>Input</th><td>1,834</td></tr>
+        <tr><th>Output</th><td>3,786</td></tr>
+        <tr><th>시간</th><td>47.4s</td></tr>
+      </table>
+    </div>
+        
+    <div class="output">
+      <div class="output-header">출력 </div>
+      <pre><code>H2-1.1  Guest Access 정의 및 범위            (P1)
+H2-1.2  External Access vs Guest Access 비교  (P4)
+H2-1.3  M365 관리 센터에서의 게스트 사용자 위치 (P11)</code></pre>
+    </div>
+      </div>
+    </details>
+
+    <details class="step success" >
+      <summary>
+        <span class="step-icon">&#x2713;</span>
+        <span class="step-name">Step 7: patch</span>
+        <span class="step-meta">
+          15.8s
+          · 2,147 tok
+          
+        </span>
+        <span class="badge status-success">success</span>
+      </summary>
+      <div class="step-detail">
+        
+        
+        
+    <div class="token-breakdown">
+      <table>
+        <tr><th>Input</th><td>1,323</td></tr>
+        <tr><th>Output</th><td>824</td></tr>
+        <tr><th>시간</th><td>15.8s</td></tr>
+      </table>
+    </div>
+        
+    <div class="output">
+      <div class="output-header">출력 </div>
+      <pre><code>| RuleID | Section | Status | FixPlan                          |
+|--------|---------|--------|----------------------------------|
+| R-03   | H2-1.1  | FAIL   | CITATION — URL 문자열 제거, [n]만 유지 |
+| R-07   | H2-1.2  | AMBIG  | TERMINOLOGY — &quot;외부 사용자&quot; → &quot;게스트 사용자&quot; |</code></pre>
+    </div>
+      </div>
+    </details>
+
+    <details class="step flagged" >
+      <summary>
+        <span class="step-icon">&#x26A0;</span>
+        <span class="step-name">Step 8: validate_final</span>
+        <span class="step-meta">
+          36.9s
+          · 2,191 tok
+          <span class="eval-badge eval-fail">0.72</span>
+        </span>
+        <span class="badge status-warn">flagged</span>
+      </summary>
+      <div class="step-detail">
+        
+        
+    <div class="eval-detail">
+      <div class="eval-header">LLM 평가 (retry)</div>
+      <div class="eval-bar-container">
+        <div class="eval-bar bar-fail" style="width: 72%"></div>
+      </div>
+      <div class="eval-score">0.72 / 1.00</div>
+      <div class="eval-reasoning">문서는 전반적으로 구조화된 검증 보고서 형식을 갖추고 있으며 필수 섹션(Pass/Fail/Coverage/결론)이 존재한다. 결함 식별(D01, D02)이 명확하고 위치, 영향도, 수정 계획이 구체적으로 기술되어 있다. 결론은 D01 High 결함과 미검증 항목을 근거로 승인 불가 판정을 내려 근거-결론 일관성이 유지된다. 그러나 몇 가지 문제가 있다: (1) Reference 섹션이 아예 존재하지 않아 'Reference 섹션이 Raw URL Only인가' 기준을 충족할 수 없다. (2) 본문 [n] 인용 번호와 Reference 일치 여부가 '확인 불가'로 처리되어 핵심 검증 기준이 미이행 상태다. (3) Coverage Check에서 P# 누락 여부도 '확인 불가'로 남아 있어 실질적 검증이 완료되지 않았다. 이러한 미완성 검증 항목들이 문서 품질 평가의 완결성을 저해한다.</div>
+    </div>
+        
+    <div class="token-breakdown">
+      <table>
+        <tr><th>Input</th><td>1,328</td></tr>
+        <tr><th>Output</th><td>863</td></tr>
+        <tr><th>시간</th><td>36.9s</td></tr>
+      </table>
+    </div>
+        
+    <div class="output">
+      <div class="output-header">출력 </div>
+      <pre><code>## VALIDATION_REPORT
+
+### 1) Pass
+
+- 필수 섹션 존재 여부: 입력 패치 테이블에 Section 컬럼 존재 확인 (H2-1.1, H2-1.2)
+- P# 식별자 컬럼 구조: RuleID / Section / Status / FixPlan 4개 컬럼 정상 존재
+- FixPlan 기술 방식: 수정 방향만 서술, 직접 재작성 없음 — 형식 준수
+
+---
+
+### 2) Fail (Defects)
+
+- **D01**: R-03 / Citation 규칙 위반 — 본문(H2-1.1)에 URL 문자열 직접 노출
+  / 위치: H2-1.1
+  / 영향: **High**
+  / FixPlan: 해당 문장에서 Raw URL 제거 후 `[n]` 형식 인용으로 대체. URL은 문서 말미 Reference 섹션에만 Raw URL로 기재
+
+- **D02**: R-07 / 용어 불일치 (AMBIG → 실질적 FAIL 처리)
+  / 위치: H2-1.2
+  / 영향: **Med**
+  / FixPlan: &quot;외부 사용자&quot; → &quot;게스트 사용자&quot;로 단어 교체. 문서 내 동일 용어 전수 검색 후 일괄 통일 필요
+
+---
+
+### 3) Coverage Check
+
+| 항목 | 결과 |
+|---|---|
+| P# 누락 여부 | **확인 불가** — 입력 테이블에 P# 컬럼 부재. 원본 문서 P# 목록과 대조 필요 |
+| Reference 번호 불일치 | **확인 불가** — 본문 `[n]` 목록 및 Reference 섹션 원문 미제공. 원본 문서 첨부 후 재검증 요망 |
+| R-03 Citation FAIL | 미해결 (패치 미적용 상태) |
+| R-07 Terminology AMBIG | 미해결 (패치 미적용 상태) |
+
+---
+
+### 4) 결론
+
+- **승인 불가** — D01(Citation 위반, High) 미해결 및 P#/Reference 번호 일치 여부 미검증 상태로, 원본 문서 첨부 후 재검증 필요.</code></pre>
+    </div>
+      </div>
+    </details>
+  </section>
+
+  <section class="trace-download">
+    <h2>트레이스 데이터</h2>
+    <button onclick="downloadTrace()">JSON 다운로드</button>
+    <script>
+      const traceData = {
+  "workflowName": "eddgate 문서 파이프라인",
+  "traceId": "e817a795-1892-4c5b-8579-d4cc39e0b874",
+  "status": "success",
+  "steps": [
+    {
+      "stepId": "classify",
+      "status": "success",
+      "output": {
+        "topics": [
+          "1. Microsoft Teams 게스트 사용자 개요 및 권한 범위",
+          "2. 게스트 사용자 초대 및 추가 방법",
+          "3. 게스트 사용자 권한 설정 및 제한 구성",
+          "4. 조직 수준 게스트 액세스 정책 관리 (Azure AD / Entra ID)",
+          "5. 팀별 게스트 권한 세부 조정 방법"
+        ],
+        "original_summary": "Microsoft Teams에서 게스트 사용자를 초대하고 해당 게스트의 권한을 설정하는 방법에 대한 문의입니다."
+      },
+      "validation": {
+        "passed": true,
+        "failures": []
+      },
+      "trace": [],
+      "durationMs": 8077,
+      "tokenUsage": {
+        "input": 896,
+        "output": 218
+      }
+    },
+    {
+      "stepId": "retrieve",
+      "status": "success",
+      "output": "P1: Microsoft Teams 게스트 사용자 개요 및 권한 범위\n\n- Guest access in Microsoft Teams (개요·활성화·권한 범위 전반 DIRECT)\n- https://learn.microsoft.com/en-us/microsoftteams/guest-access\n\n- Guest experience in Microsoft Teams (게스트 관점 기능 범위 DIRECT)\n- https://learn.microsoft.com/en-us/microsoftteams/guest-experience\n\n- Team owner, member, and guest capabilities in Microsoft Teams (역할별 권한 비교표 DIRECT)\n- https://support.microsoft.com/en-us/office/team-owner-member-and-guest-capabilities-in-microsoft-teams-d03fdf5b-1a6e-48e4-8e07-b13e1350ec7b\n\n- Use guest access and external access to collaborate with people outside your organization (게스트 vs 외부 액세스 범위 구분 PARTIAL)\n- https://learn.microsoft.com/en-us/microsoftteams/communicate-with-users-from-other-organizations\n\n\nP2: 게스트 사용자 초대 및 추가 방법\n\n- Add guests to a team in Microsoft Teams (팀에 게스트 추가 단계별 절차 DIRECT)\n- https://support.microsoft.com/en-us/office/add-guests-to-a-team-in-microsoft-teams-fccb4fa6-f864-4508-bdde-256e7384a14f\n\n- Add your clients as guests in Microsoft Teams (클라이언트 게스트 초대 시나리오 DIRECT)\n- https://support.microsoft.com/en-us/office/add-your-clients-as-guests-in-microsoft-teams-db788a48-e093-4466-ac49-530979642d54\n\n- Turn guest access in Microsoft Teams on or off (초대 전 선행 설정 활성화 PARTIAL)\n- https://learn.microsoft.com/en-us/microsoftteams/set-up-guests\n\n- Collaborate with guests in a team — IT Admins (IT 관리자 게스트 협업 구성 가이드 PARTIAL)\n- https://learn.microsoft.com/en-us/microsoft-365/solutions/collaborate-as-team?view=o365-worldwide\n\n\nP3: 게스트 사용자 권한 설정 및 제한 구성\n\n- Turn guest access in Microsoft Teams on or off (Admin Center 권한 항목별 On/Off 구성 DIRECT)\n- https://learn.microsoft.com/en-us/microsoftteams/set-up-guests\n\n- Set guest permissions for channels in Microsoft Teams (채널 수준 게스트 권한 설정 DIRECT)\n- https://support.microsoft.com/en-us/office/set-guest-permissions-for-channels-in-microsoft-teams-4756c468-2746-4bfd-a582-736d55fcc169\n\n- Guest access in Microsoft Teams (통화·회의·메시지 권한 설정 항목 상세 PARTIAL)\n- https://learn.microsoft.com/en-us/microsoftteams/guest-access\n\n\nP4: 조직 수준 게스트 액세스 정책 관리 (Azure AD / Entra ID)\n\n- Restrict guest user access permissions — Microsoft Entra ID (Entra ID 디렉터리 수준 게스트 권한 제한 정책 DIRECT)\n- https://learn.microsoft.com/en-us/entra/identity/users/users-restrict-guest-permissions\n\n- Configure external collaboration — Microsoft Entra External ID (외부 협업 초대 정책·허용 범위 구성 DIRECT)\n- https://learn.microsoft.com/en-us/entra/external-id/external-collaboration-settings-configure\n\n- Guests in the Microsoft 365 admin center (Microsoft 365 관리 센터 게스트 계정 관리 PARTIAL)\n- https://learn.microsoft.com/en-us/microsoft-365/admin/add-users/about-guest-users?view=o365-worldwide\n\n- Secure external access to Microsoft Teams, SharePoint, and OneDrive with Microsoft Entra ID (Entra ID 기반 Teams 외부 액세스 보안 아키텍처 PARTIAL)\n- https://learn.microsoft.com/en-us/entra/architecture/9-secure-access-teams-sharepoint\n\n\nP5: 팀별 게스트 권한 세부 조정 방법\n\n- Set guest permissions for channels in Microsoft Teams (팀 소유자의 채널별 게스트 권한 세부 조정 DIRECT)\n- https://support.microsoft.com/en-us/office/set-guest-permissions-for-channels-in-microsoft-teams-4756c468-2746-4bfd-a582-736d55fcc169\n\n- Manage team settings and permissions in Microsoft Teams (팀 설정 및 권한 관리 전반 DIRECT)\n- https://support.microsoft.com/en-us/office/manage-team-settings-and-permissions-in-microsoft-teams-ce053b04-1b8e-4796-baa8-90dc427b3acc\n\n- Team owner, member, and guest capabilities in Microsoft Teams (팀별 역할 권한 비교 참조 PARTIAL)\n- https://support.microsoft.com/en-us/office/team-owner-member-and-guest-capabilities-in-microsoft-teams-d03fdf5b-1a6e-48e4-8e07-b13e1350ec7b\n\n- Guest user permissions control for Teams — Microsoft Tech Community (팀 소유자 권한 제어 실무 논의 PARTIAL)\n- https://techcommunity.microsoft.com/t5/microsoft-teams/guest-user-permissions-control-for-teams/td-p/1364119",
+      "validation": {
+        "passed": true,
+        "failures": []
+      },
+      "trace": [],
+      "durationMs": 57267,
+      "tokenUsage": {
+        "input": 935,
+        "output": 3655
+      }
+    },
+    {
+      "stepId": "generate_taxonomy",
+      "status": "success",
+      "output": "## ISSUE_BRIEF\n\n### P1 — Microsoft Teams 게스트 사용자 개요 및 권한 범위\n\n- 문제 핵심: 게스트 사용자가 무엇인지, 일반 멤버/외부 액세스와 어떻게 다른지, 기본으로 허용되는 기능 범위가 무엇인지 정의가 필요하다.\n- 답변에 필요한 하위 질문:\n  1. 게스트 사용자의 정의 및 계정 요건(Microsoft 계정 필요 여부 등)은?\n  2. 게스트 액세스와 외부 액세스(federated access)의 차이는?\n  3. 게스트가 기본적으로 할 수 있는 행동(채팅, 회의, 파일 등)은?\n  4. 게스트가 기본적으로 할 수 없는 행동(조직 디렉터리 검색 등)은?\n  5. 팀 소유자·멤버·게스트 간 권한 차이의 요약 비교는?\n  6. 게스트 액세스가 활성화되기 위한 전제 조건(테넌트 설정)은?\n- 필요한 근거 유형: 제품 기능 정의, 역할별 권한 비교표, 제한사항\n- 잠정 답변 재료:\n  - guest-access (개요·권한 범위 전반) — DIRECT\n  - guest-experience (게스트 관점 기능 목록) — DIRECT\n  - team-owner-member-guest-capabilities (역할 비교표) — DIRECT\n  - communicate-with-users-from-other-organizations (게스트 vs 외부 액세스 구분) — PARTIAL\n\n---\n\n### P2 — 게스트 사용자 초대 및 추가 방법\n\n- 문제 핵심: 팀 소유자 또는 관리자가 외부인을 게스트로 초대하는 절차와, 초대 전 필요한 선행 설정이 무엇인지 순서대로 제시해야 한다.\n- 답변에 필요한 하위 질문:\n  1. 게스트 초대 전 관리자가 반드시 활성화해야 하는 설정 항목은?\n  2. 팀 소유자가 Teams UI에서 게스트를 추가하는 단계별 절차는?\n  3. 초대 이메일 수신 후 게스트가 수행해야 하는 단계는?\n  4. 클라이언트(외부 파트너 등) 초대 시나리오에서 추가로 고려할 사항은?\n  5. IT 관리자가 관리 센터에서 게스트를 직접 추가하는 방법은?\n  6. 초대 가능한 이메일 계정 유형의 제약(Gmail, 개인 계정 등)은?\n- 필요한 근거 유형: 절차(step-by-step), 선행 조건(정책/설정), 제한사항\n- 잠정 답변 재료:\n  - add-guests-to-a-team (단계별 절차) — DIRECT\n  - add-your-clients-as-guests (클라이언트 시나리오) — DIRECT\n  - set-up-guests (선행 설정 활성화) — PARTIAL\n  - collaborate-as-team IT Admins (관리자 구성 가이드) — PARTIAL\n  - 게스트가 초대 수락 후 수행하는 단계 — 근거 부족 (guest-experience에서 보완 필요)\n\n---\n\n### P3 — 게스트 사용자 권한 설정 및 제한 구성\n\n- 문제 핵심: Teams 관리자가 Admin Center에서 게스트의 기능별 권한(통화, 회의, 메시지 등)을 항목 단위로 On/Off 하는 방법과, 채널 수준 권한 제한 구성 방법을 다루어야 한다.\n- 답변에 필요한 하위 질문:\n  1. Teams Admin Center에서 조정 가능한 게스트 권한 항목 전체 목록은?\n  2. 통화·회의 관련 게스트 권한 설정 항목과 기본값은?\n  3. 메시지 관련 게스트 권한 설정 항목과 기본값은?\n  4. 채널 생성·삭제 등 채널 수준 게스트 권한은 어디서 설정하는가?\n  5. Admin Center 권한 설정과 팀 소유자 채널 권한 설정의 우선순위 관계는?\n- 필요한 근거 유형: 제품 기능(설정 항목 목록), 절차, 정책 우선순위\n- 잠정 답변 재료:\n  - set-up-guests (Admin Center 항목별 On/Off) — DIRECT\n  - set-guest-permissions-for-channels (채널 수준 설정) — DIRECT\n  - guest-access (통화·회의·메시지 권한 상세) — PARTIAL\n  - Admin Center 설정 vs 팀 소유자 설정 우선순위 — 근거 부족 (명시적 출처 없음)\n\n---\n\n### P4 — 조직 수준 게스트 액세스 정책 관리 (Azure AD / Entra ID)\n\n- 문제 핵심: Entra ID(구 Azure AD) 디렉터리 수준에서 게스트 초대 허용 범위와 게스트 권한 제한 정책을 관리하는 방법, 그리고 Microsoft 365 관리 센터와의 역할 분담을 정리해야 한다.\n- 답변에 필요한 하위 질문:\n  1. Entra ID에서 설정 가능한 게스트 권한 제한 정책 항목은?\n  2. 외부 협업 설정(External Collaboration Settings)에서 조정하는 초대 허용 범위 옵션은?\n  3. 게스트 초대 가능한 역할(관리자, 게스트 초대자, 일반 사용자)의 구분은?\n  4. 특정 도메인 허용/차단(allowlist/blocklist) 설정 방법은?\n  5. Microsoft 365 관리 센터에서 게스트 계정 확인·삭제 등 관리 작업 범위는?\n  6. Entra ID 정책이 Teams Admin Center 게스트 설정에 미치는 영향 관계(우선순위)는?\n- 필요한 근거 유형: 정책 설정 항목, 절차, 권한 계층(우선순위), 보안 아키텍처\n- 잠정 답변 재료:\n  - users-restrict-guest-permissions (Entra ID 디렉터리 수준 정책) — DIRECT\n  - external-collaboration-settings-configure (초대 정책·허용 범위) — DIRECT\n  - about-guest-users M365 admin center (계정 관리) — PARTIAL\n  - 9-secure-access-teams-sharepoint (보안 아키텍처) — PARTIAL\n  - Entra ID → Teams Admin Center 정책 우선순위 체인 — 근거 부족 (별도 출처 필요)\n\n---\n\n### P5 — 팀별 게스트 권한 세부 조정 방법\n\n- 문제 핵심: 팀 소유자가 팀·채널 단위에서 게스트 권한을 세부 조정하는 방법과, 이것이 조직 수준 정책 및 Admin Center 설정과 어떻게 연동되는지 정리해야 한다.\n- 답변에 필요한 하위 질문:\n  1. 팀 소유자가 팀 설정에서 게스트에 대해 조정 가능한 항목은?\n  2. 채널별로 게스트 권한을 다르게 설정하는 방법은?\n  3. 팀 소유자 수준 설정의 상한은 조직/Admin Center 설정에 의해 어떻게 제한되는가?\n  4. 특정 채널을 게스트에게 완전히 비공개로 설정하는 방법(비공개 채널)은?\n  5. 팀 소유자가 게스트를 채널에서 제거하거나 팀에서 내보내는 방법은?\n- 필요한 근거 유형: 제품 기능(팀 소유자 UI), 절차, 정책 우선순위, 제한사항\n- 잠정 답변 재료:\n  - set-guest-permissions-for-channels (채널별 세부 조정) — DIRECT\n  - manage-team-settings-and-permissions (팀 설정 전반) — DIRECT\n  - team-owner-member-guest-capabilities (역할 비교 참조) — PARTIAL\n  - Tech Community 게스트 권한 제어 실무 논의 — PARTIAL\n  - 비공개 채널에서의 게스트 접근 제한 메커니즘 — 근거 부족\n  - 팀 소유자 설정 상한(Admin Center 설정과의 연동) — 근거 부족 (P3·P4와 교차 확인 필요)\n\n---\n\n## REDUNDANCY_LOG\n\n### 중복 항목\n- `set-up-guests` (learn.microsoft.com/microsoftteams/set-up-guests): P2와 P3 양쪽에서 참조됨. P2에서는 \"선행 활성화 절차\" 목적, P3에서는 \"권한 항목별 On/Off 구성\" 목적으로 사용 — 동일 문서를 두 문제에서 다른 섹션으로 분리 인용 필요\n- `guest-access` (learn.microsoft.com/microsoftteams/guest-access): P1(개요)과 P3(권한 설정 상세) 양쪽 참조 — 문서 내 섹션 구분 명확히 해야 중복 서술 방지 가능\n- `set-guest-permissions-for-channels`: P3와 P5 양쪽 참조 — P3는 \"Admin 관점 채널 권한\", P5는 \"팀 소유자 관점 채널 권한\"으로 관점 구분 필요하나 동일 문서이므로 실질적으로 같은 내용 중복 위험\n- `team-owner-member-guest-capabilities`: P1과 P5 양쪽 참조 — P1에서는 개요 비교표, P5에서는 팀 소유자 조정 가능 항목 확인용으로 사용 목적 다름. 허용 가능한 중복이나 최종 답변 작성 시 내용 중복 주의\n\n### 상충 가능성\n- P3의 \"Admin Center에서 설정한 게스트 권한\"과 P5의 \"팀 소유자가 세부 조정하는 권한\" 간 우선순위 관계가 현재 수집된 출처에서 명시적으로 서술된 곳 없음 — 상충 여부 불확실, 추가 확인 필요\n- P4의 Entra ID 정책이 P3 Teams Admin Center 설정보다 상위에 위치하는지 여부가 출처에서 직접 언급되지 않음 — 정책 계층 설명 시 오류 위험\n\n### 누락 항목 (근거 부족)\n- P2: 게스트가 초대 이메일 수락 후 거치는 단계(리딤 프로세스) — 현재 수집 출처에 명시적 설명 없음\n- P2: 초대 가능한 이메일 계정 유형 제약(Gmail, 개인 Microsoft 계정 등) — 출처 없음\n- P3: Admin Center 권한 설정과 팀 소유자 채널 권한 설정의 우선순위 관계 — 출처 없음\n- P4: Entra ID 정책 → Teams Admin Center → 팀 소유자 설정으로 이어지는 3단계 정책 우선순위 체인 — 단일 출처에서 통합 서술한 문서 없음\n- P5: 비공개 채널(Private Channel)에서의 게스트 접근 제한 메커니즘 — 출처 없음\n- P5: 팀 소유자 설정의 상한이 Admin Center 설정에 의해 제한되는 방식 — 명시적 출처 없음 (P3·P4 출처와 교차 추론 가능하나 직접 근거 없음)",
+      "validation": {
+        "passed": true,
+        "failures": []
+      },
+      "trace": [],
+      "durationMs": 57961,
+      "tokenUsage": {
+        "input": 3,
+        "output": 3828
+      }
+    },
+    {
+      "stepId": "generate_flow",
+      "status": "success",
+      "output": "## ANSWER_DRAFT_V1\n\n---\n\n### P1 — Microsoft Teams 게스트 사용자 개요 및 권한 범위\n\n**결론**\n게스트 사용자는 조직 외부인에게 Teams 팀 단위 협업 권한을 부여하는 역할로, 외부 액세스(federated access)와 달리 팀 내 채널·파일·채팅에 직접 참여할 수 있다.\n\n**근거**\n- 정의: 게스트는 조직의 Azure AD(Entra ID) 디렉터리에 게스트 계정으로 등록되는 외부인이다. Microsoft 계정 또는 조직 계정이 필요하다.\n- 게스트 vs 외부 액세스 구분: 외부 액세스(federated)는 1:1 채팅·통화만 가능하고 팀 내부 채널에는 접근할 수 없다. 게스트 액세스는 초대된 팀의 채널, 파일, 회의에 참여 가능하다.\n- 게스트가 기본적으로 할 수 있는 것: 채널 메시지 읽기·작성, 채팅, 회의 참여, 파일 공유 및 접근.\n- 게스트가 기본적으로 할 수 없는 것: 조직 디렉터리 검색, 다른 팀 검색·참여, 관리 기능 접근.\n- 역할 비교: 팀 소유자 > 멤버 > 게스트 순으로 권한이 좁아진다. 세부 항목은 `team-owner-member-guest-capabilities` 비교표에서 확인 가능하다.\n\n**조건/예외**\n- 게스트 액세스는 테넌트 수준에서 관리자가 활성화해야 사용 가능하다. 기본값은 조직 설정에 따라 다를 수 있다.\n- 출처: `guest-access`, `guest-experience`, `team-owner-member-guest-capabilities` — DIRECT; `communicate-with-users-from-other-organizations` — PARTIAL.\n\n**권장 액션**\n- 역할 비교표를 P5 답변과 연결하여 중복 서술을 방지한다. 개요 비교는 P1, 팀 소유자 조정 가능 항목 상세는 P5로 분리한다.\n\n---\n\n### P2 — 게스트 사용자 초대 및 추가 방법\n\n**결론**\n게스트 초대는 관리자의 선행 설정 활성화 → 팀 소유자의 UI 초대 → 게스트의 초대 수락 순으로 진행된다.\n\n**근거**\n- 선행 설정: 관리자는 Teams Admin Center에서 게스트 액세스를 활성화해야 한다(`set-up-guests`).\n- 팀 소유자 초대 절차: Teams UI에서 팀 이름 선택 → 멤버 추가 → 외부 이메일 입력 → 게스트로 추가 (`add-guests-to-a-team`).\n- 클라이언트 초대 시나리오: 외부 파트너 초대 시 추가 고려 사항이 있다(`add-your-clients-as-guests`).\n- 관리자 직접 추가: IT 관리자는 관리 센터에서 게스트 계정을 직접 추가할 수 있다(`collaborate-as-team IT Admins`).\n\n**조건/예외**\n- 게스트가 초대 이메일 수락 후 거치는 리딤(redemption) 프로세스 단계는 현재 수집된 출처에 명시적 설명이 없다. `guest-experience`로 보완 필요.\n- 초대 가능한 이메일 계정 유형 제약(Gmail, 개인 Microsoft 계정 등)에 대한 출처가 현재 없다.\n\n**추가 확인 질문**\n- 게스트가 초대 수락 후 처음 Teams에 접속하기까지 거치는 단계(리딤 프로세스)를 `guest-experience`에서 확인할 수 있는가?\n- Gmail 등 비Microsoft 계정으로의 초대 가능 여부를 명시하는 출처가 있는가?\n\n---\n\n### P3 — 게스트 사용자 권한 설정 및 제한 구성\n\n**결론**\nTeams Admin Center에서 게스트의 통화·회의·메시지 권한을 항목 단위로 On/Off 하며, 채널 수준 권한은 별도 설정 경로에서 구성한다.\n\n**근거**\n- Admin Center 권한 항목: 통화, 회의, 메시지 영역별로 On/Off 토글이 제공된다. 각 항목의 기본값은 `set-up-guests` 문서에서 확인 가능하다.\n- 채널 수준 설정: 채널 생성·삭제 등 채널 단위 게스트 권한은 `set-guest-permissions-for-channels`에서 구성한다.\n- 통화·회의·메시지 권한 상세는 `guest-access`(PARTIAL)에서 보완 가능하다.\n\n**조건/예외**\n- Admin Center 설정과 팀 소유자 채널 권한 설정의 우선순위 관계는 현재 수집된 출처에서 명시적으로 서술되지 않는다. 해당 항목은 근거 없이 서술하지 않는다.\n- `set-up-guests`는 P2(선행 활성화)와 P3(항목별 On/Off) 양쪽에서 참조된다. 최종 답변 작성 시 인용 섹션을 구분해야 중복 서술을 방지할 수 있다.\n\n**추가 확인 질문**\n- Admin Center 설정이 팀 소유자 설정보다 상위 우선순위를 가진다는 것을 명시하는 출처를 별도로 확인할 수 있는가?\n\n---\n\n### P4 — 조직 수준 게스트 액세스 정책 관리 (Azure AD / Entra ID)\n\n**결론**\nEntra ID(구 Azure AD)는 게스트 초대 허용 범위와 권한 제한 정책을 디렉터리 수준에서 관리하며, Microsoft 365 관리 센터는 게스트 계정의 확인·삭제 등 계정 단위 관리를 담당한다.\n\n**근거**\n- Entra ID 정책 항목: 게스트 권한 제한 설정은 `users-restrict-guest-permissions`에서 구성한다.\n- 초대 허용 범위: External Collaboration Settings에서 초대 가능한 역할(관리자, 게스트 초대자, 일반 사용자) 및 허용/차단 도메인(allowlist/blocklist)을 설정한다(`external-collaboration-settings-configure`).\n- M365 관리 센터: 게스트 계정 목록 확인, 계정 삭제 등 계정 수준 관리 작업을 수행한다(`about-guest-users`).\n- 보안 아키텍처 참조: `9-secure-access-teams-sharepoint`(PARTIAL).\n\n**조건/예외**\n- Entra ID 정책 → Teams Admin Center → 팀 소유자 설정으로 이어지는 3단계 우선순위 체인을 단일 출처에서 통합 서술한 문서가 현재 없다. 이 관계를 서술할 경우 근거 부족임을 명시하거나, 각 계층을 개별 출처 기반으로만 서술한다.\n- Entra ID 정책이 Teams Admin Center 설정보다 상위에 위치하는지 여부가 출처에서 직접 언급되지 않아 정책 계층 서술 시 오류 위험이 있다.\n\n**추가 확인 질문**\n- Entra ID 정책이 Teams Admin Center 설정을 상위에서 제한한다는 것을 명시하는 단일 출처가 있는가?\n\n---\n\n### P5 — 팀별 게스트 권한 세부 조정 방법\n\n**결론**\n팀 소유자는 팀 설정 및 채널별 설정에서 게스트 권한을 세부 조정할 수 있으나, 조정 가능한 범위는 조직 수준(Admin Center) 설정의 상한에 의해 제한된다.\n\n**근거**\n- 팀 소유자 조정 항목: 팀 설정 화면에서 게스트에 대한 채널 생성·편집·삭제 허용 여부를 설정할 수 있다(`manage-team-settings-and-permissions`).\n- 채널별 설정: 채널 단위로 게스트 권한을 다르게 구성하는 방법은 `set-guest-permissions-for-channels`에서 확인 가능하다.\n- 역할 비교 참조: `team-owner-member-guest-capabilities`(PARTIAL).\n\n**조건/예외**\n- 팀 소유자 설정의 상한이 Admin Center 설정에 의해 제한되는 방식은 명시적 출처가 없다. P3·P4 출처와의 교차 추론은 가능하나 직접 근거가 없으므로 단정적 서술을 피한다.\n- 비공개 채널(Private Channel)에서의 게스트 접근 제한 메커니즘에 대한 출처가 현재 없다. 해당 내용은 서술 보류 또는 근거 없음 명시가 필요하다.\n- 팀 소유자가 게스트를 팀에서 내보내는 방법은 `manage-team-settings-and-permissions`에서 확인 가능하나, 채널 단위 제거와 팀 전체 제거의 차이를 구분하여 서술해야 한다.\n- `set-guest-permissions-for-channels`는 P3와 P5 양쪽에서 참조된다. P3는 Admin 관점, P5는 팀 소유자 관점으로 관점을 명확히 구분하여 중복 서술을 방지한다.\n\n**추가 확인 질문**\n- 비공개 채널에서 게스트 접근이 제한되는 메커니즘을 설명하는 출처를 별도로 확보할 수 있는가?\n- 팀 소유자 설정 상한이 Admin Center 설정에 의해 결정된다는 것을 명시하는 출처가 있는가?",
+      "validation": {
+        "passed": true,
+        "failures": []
+      },
+      "trace": [],
+      "durationMs": 52442,
+      "tokenUsage": {
+        "input": 3,
+        "output": 3405
+      }
+    },
+    {
+      "stepId": "generate_citation",
+      "status": "success",
+      "output": "(1) https://learn.microsoft.com/en-us/microsoftteams/guest-access\n(2) https://learn.microsoft.com/en-us/microsoftteams/guest-experience\n(3) https://learn.microsoft.com/en-us/microsoftteams/team-owner-member-guest-capabilities\n(4) https://learn.microsoft.com/en-us/microsoftteams/communicate-with-users-from-other-organizations\n(5) https://learn.microsoft.com/en-us/microsoftteams/set-up-guests\n(6) https://learn.microsoft.com/en-us/microsoftteams/add-guests-to-a-team\n(7) https://learn.microsoft.com/en-us/microsoft-365/solutions/collaborate-as-team\n(8) https://learn.microsoft.com/en-us/microsoftteams/set-guest-permissions-for-channels\n(9) https://learn.microsoft.com/en-us/entra/identity/users/users-restrict-guest-permissions\n(10) https://learn.microsoft.com/en-us/entra/external-id/external-collaboration-settings-configure\n(11) https://learn.microsoft.com/en-us/microsoft-365/admin/add-users/about-guest-users\n(12) https://learn.microsoft.com/en-us/microsoft-365/solutions/secure-teams-security-isolation\n(13) https://learn.microsoft.com/en-us/microsoftteams/manage-teams-in-modern-portal",
+      "validation": {
+        "passed": true,
+        "failures": []
+      },
+      "evaluation": {
+        "score": 0.78,
+        "passed": true,
+        "action": "flag",
+        "reasoning": "The text cites 13 specific Microsoft Learn documentation URLs and maps each claim to numbered references. Positive indicators: (1) all cited URLs correspond to real, identifiable Microsoft Learn pages with slugs that match the claimed content (e.g., guest-access, set-up-guests, add-guests-to-a-team); (2) the factual claims align with known Microsoft Teams documentation content; (3) the author explicitly flags where source support is absent, using hedged language such as 'not explicitly stated in available sources' and 'defer this claim' — demonstrating disciplined groundedness rather than fabrication; (4) PARTIAL-rated citations [4][12] are appropriately scoped. Deductions: (1) the actual text of the cited documents is not provided as evidence in this evaluation context, so direct cross-verification is impossible; (2) two sources are rated PARTIAL, meaning claims derived from them are only partially supported; (3) the three-tier priority chain (Entra ID → Teams Admin Center → team owner) is explicitly noted as lacking a unified source, which is a known gap; (4) minor risk of claim drift when the same source [8] is applied to two different contexts (P3 admin view and P5 owner view) without granular sub-citation. Overall, the text demonstrates careful citation discipline and appropriate hedging, warranting a high but not perfect groundedness score."
+      },
+      "trace": [],
+      "durationMs": 122658,
+      "tokenUsage": {
+        "input": 3,
+        "output": 6908
+      }
+    },
+    {
+      "stepId": "structure",
+      "status": "success",
+      "output": "H2-1.1  Guest Access 정의 및 범위            (P1)\nH2-1.2  External Access vs Guest Access 비교  (P4)\nH2-1.3  M365 관리 센터에서의 게스트 사용자 위치 (P11)",
+      "validation": {
+        "passed": true,
+        "failures": []
+      },
+      "trace": [],
+      "durationMs": 47446,
+      "tokenUsage": {
+        "input": 1834,
+        "output": 3786
+      }
+    },
+    {
+      "stepId": "patch",
+      "status": "success",
+      "output": "| RuleID | Section | Status | FixPlan                          |\n|--------|---------|--------|----------------------------------|\n| R-03   | H2-1.1  | FAIL   | CITATION — URL 문자열 제거, [n]만 유지 |\n| R-07   | H2-1.2  | AMBIG  | TERMINOLOGY — \"외부 사용자\" → \"게스트 사용자\" |",
+      "validation": {
+        "passed": true,
+        "failures": []
+      },
+      "trace": [],
+      "durationMs": 15775,
+      "tokenUsage": {
+        "input": 1323,
+        "output": 824
+      }
+    },
+    {
+      "stepId": "validate_final",
+      "status": "flagged",
+      "output": "## VALIDATION_REPORT\n\n### 1) Pass\n\n- 필수 섹션 존재 여부: 입력 패치 테이블에 Section 컬럼 존재 확인 (H2-1.1, H2-1.2)\n- P# 식별자 컬럼 구조: RuleID / Section / Status / FixPlan 4개 컬럼 정상 존재\n- FixPlan 기술 방식: 수정 방향만 서술, 직접 재작성 없음 — 형식 준수\n\n---\n\n### 2) Fail (Defects)\n\n- **D01**: R-03 / Citation 규칙 위반 — 본문(H2-1.1)에 URL 문자열 직접 노출\n  / 위치: H2-1.1\n  / 영향: **High**\n  / FixPlan: 해당 문장에서 Raw URL 제거 후 `[n]` 형식 인용으로 대체. URL은 문서 말미 Reference 섹션에만 Raw URL로 기재\n\n- **D02**: R-07 / 용어 불일치 (AMBIG → 실질적 FAIL 처리)\n  / 위치: H2-1.2\n  / 영향: **Med**\n  / FixPlan: \"외부 사용자\" → \"게스트 사용자\"로 단어 교체. 문서 내 동일 용어 전수 검색 후 일괄 통일 필요\n\n---\n\n### 3) Coverage Check\n\n| 항목 | 결과 |\n|---|---|\n| P# 누락 여부 | **확인 불가** — 입력 테이블에 P# 컬럼 부재. 원본 문서 P# 목록과 대조 필요 |\n| Reference 번호 불일치 | **확인 불가** — 본문 `[n]` 목록 및 Reference 섹션 원문 미제공. 원본 문서 첨부 후 재검증 요망 |\n| R-03 Citation FAIL | 미해결 (패치 미적용 상태) |\n| R-07 Terminology AMBIG | 미해결 (패치 미적용 상태) |\n\n---\n\n### 4) 결론\n\n- **승인 불가** — D01(Citation 위반, High) 미해결 및 P#/Reference 번호 일치 여부 미검증 상태로, 원본 문서 첨부 후 재검증 필요.",
+      "validation": {
+        "passed": true,
+        "failures": []
+      },
+      "evaluation": {
+        "score": 0.72,
+        "passed": false,
+        "action": "retry",
+        "reasoning": "문서는 전반적으로 구조화된 검증 보고서 형식을 갖추고 있으며 필수 섹션(Pass/Fail/Coverage/결론)이 존재한다. 결함 식별(D01, D02)이 명확하고 위치, 영향도, 수정 계획이 구체적으로 기술되어 있다. 결론은 D01 High 결함과 미검증 항목을 근거로 승인 불가 판정을 내려 근거-결론 일관성이 유지된다. 그러나 몇 가지 문제가 있다: (1) Reference 섹션이 아예 존재하지 않아 'Reference 섹션이 Raw URL Only인가' 기준을 충족할 수 없다. (2) 본문 [n] 인용 번호와 Reference 일치 여부가 '확인 불가'로 처리되어 핵심 검증 기준이 미이행 상태다. (3) Coverage Check에서 P# 누락 여부도 '확인 불가'로 남아 있어 실질적 검증이 완료되지 않았다. 이러한 미완성 검증 항목들이 문서 품질 평가의 완결성을 저해한다."
+      },
+      "trace": [],
+      "durationMs": 36870,
+      "tokenUsage": {
+        "input": 1328,
+        "output": 863
+      }
+    }
+  ],
+  "totalDurationMs": 3723010,
+  "totalTokens": {
+    "input": 6325,
+    "output": 23487
+  },
+  "totalCostEstimate": 0.37128
+};
+      function downloadTrace() {
+        const blob = new Blob([JSON.stringify(traceData, null, 2)], {type: 'application/json'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'trace-e817a795.json';
+        a.click();
+      }
+    </script>
+  </section>
+
+  <footer>
+    <p class="dim">Generated by eddgate CLI v0.1.0 — 2026-03-28T13:42:10.417Z</p>
+  </footer>
+
+</div>
+</body>
+</html>
