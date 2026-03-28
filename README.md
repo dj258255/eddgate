@@ -173,13 +173,13 @@ Run `eddgate` for the full-screen terminal UI. Everything is accessible from men
 | Menu | What it does |
 |------|-------------|
 | **Run** | Select workflow, model, effort, thinking mode, input. Configure run options (HTML report, JSONL trace, budget limit, dry run). Live dashboard during execution. Results panel with step table after completion. |
-| **Analyze** | Choose context profiler or failure analysis. Results displayed in-screen. |
-| **Test** | Snapshot current behavior, diff against baseline, or list saved snapshots. |
+| **Analyze** | Failure analysis, context profiler, offline eval (re-score traces with LLM judge), diff-eval (compare scores between git commits), version-diff (prompt/workflow changes between commits). |
+| **Test** | Snapshot, diff, list snapshots, deployment gate (check thresholds). |
 | **Monitor** | Status overview (success rate gauge, metrics table), cost breakdown (bar chart by model, table by step), quality scores (eval averages with distribution bars). All from saved traces. |
 | **Traces** | Browse saved trace files. Select one to view: steps summary (left) + full event timeline (right) with color-coded events, token counts, scores. |
 | **MCP** | Add/remove/list MCP servers without editing YAML. |
-| **Plugins** | View installed workflows, roles, Claude Code plugins. Import from file browser. |
-| **Settings** | Change default model, language (Korean/English), trace config. |
+| **Plugins** | View workflows/roles, visualize workflow (ASCII diagram), debug single step in isolation, import from file. |
+| **Settings** | Default model, language (Korean/English), view config, doctor (health check), init (scaffold project). |
 
 Keyboard: Arrow keys navigate, Enter selects, Esc goes back, q quits, Tab switches panels.
 
