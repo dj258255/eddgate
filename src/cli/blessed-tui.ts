@@ -90,6 +90,11 @@ export async function launchBlessedTUI(): Promise<void> {
   });
 
   screen.key(["q", "C-c"], () => quit());
+  screen.key(["escape"], () => {
+    // Esc: if in content, go back to menu. If in menu, do nothing (don't freeze).
+    menuBox.focus();
+    screen.render();
+  });
   screen.key(["tab"], () => {
     if ((menuBox as any).focused) contentBox.focus(); else menuBox.focus();
     screen.render();

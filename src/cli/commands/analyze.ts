@@ -2,6 +2,7 @@ import { readFile, readdir, writeFile, mkdir } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import chalk from "chalk";
 import type { TraceEvent, ValidationResult, EvaluationResult } from "../../types/index.js";
+import { initLang, t } from "../../i18n/index.js";
 
 interface AnalyzeOptions {
   dir: string;
@@ -53,9 +54,11 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
     return;
   }
 
+  initLang();
+
   const traceCount = new Set(events.map((e) => e.traceId)).size;
-  console.log(chalk.bold("\neddgate analyze\n"));
-  console.log(chalk.dim(`  ${events.length} events from ${traceCount} run(s)\n`));
+  console.log(chalk.bold(`\n${t("analyzeOutput.title")}\n`));
+  console.log(chalk.dim(`  ${events.length}${t("analyzeOutput.eventsFrom")}${traceCount}${t("analyzeOutput.runs")}\n`));
 
   if (options.context) {
     renderContextProfile(events);
@@ -64,7 +67,7 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
 
   const failures = extractFailures(events);
   if (failures.length === 0) {
-    console.log(chalk.green("  No failures found.\n"));
+    console.log(chalk.green(`  ${t("analyzeOutput.noFailures")}\n`));
     return;
   }
 
@@ -201,52 +204,52 @@ function clusterFailures(failures: FailureInstance[]): FailureCluster[] {
 
 function buildDescription(type: string, stepId: string, instances: FailureInstance[], avgScore?: number): string {
   if (type === "eval_fail") {
-    return `Eval gate failed at "${stepId}" (avg score: ${avgScore?.toFixed(2) ?? "?"}, ${instances.length} times)`;
+    return `${t("analyzeOutput.evalFail")} "${stepId}" (avg: ${avgScore?.toFixed(2) ?? "?"}, ${instances.length}x)`;
   }
   if (type === "validation_fail") {
     const msgs = [...new Set(instances.map((i) => i.message))];
-    return `Validation failed at "${stepId}": ${msgs.join(", ")}`;
+    return `${t("analyzeOutput.validationFail")} "${stepId}": ${msgs.join(", ")}`;
   }
   if (type.includes("rate_limit")) {
-    return `Rate limit hit at "${stepId}" (${instances.length} times)`;
+    return `${t("analyzeOutput.rateLimitHit")} "${stepId}" (${instances.length})`;
   }
   if (type.includes("timeout")) {
-    return `Timeout at "${stepId}" (${instances.length} times)`;
+    return `${t("analyzeOutput.timeoutAt")} "${stepId}" (${instances.length})`;
   }
-  return `Runtime error at "${stepId}" (${instances.length} times)`;
+  return `${t("analyzeOutput.runtimeError")} "${stepId}" (${instances.length})`;
 }
 
 function buildFix(type: string, stepId: string, instances: FailureInstance[], avgScore?: number, range?: { min: number; max: number }): string {
   if (type === "eval_fail" && avgScore !== undefined) {
     if (avgScore >= 0.65) {
-      return `Scores are close to threshold (avg ${avgScore.toFixed(2)}). Options: (1) lower threshold slightly, (2) improve prompt specificity for "${stepId}", (3) add few-shot examples to the role prompt`;
+      return `${t("analyzeOutput.fixScoreClose")} (avg ${avgScore.toFixed(2)}, "${stepId}")`;
     }
     if (avgScore >= 0.4) {
-      return `Moderate eval failures (avg ${avgScore.toFixed(2)}). Check: (1) is retrieval returning relevant docs? (2) is the prompt too vague? (3) consider splitting this step into smaller sub-steps`;
+      return `${t("analyzeOutput.fixScoreModerate")} (avg ${avgScore.toFixed(2)}, "${stepId}")`;
     }
-    return `Severe eval failures (avg ${avgScore.toFixed(2)}). The step "${stepId}" may need fundamental redesign -- check if the task is too complex for a single step`;
+    return `${t("analyzeOutput.fixScoreSevere")} (avg ${avgScore.toFixed(2)}, "${stepId}")`;
   }
 
   if (type === "validation_fail") {
     const msgs = [...new Set(instances.map((i) => i.message))];
     if (msgs.some((m) => m.includes("short") || m.includes("짧"))) {
-      return `Output too short. Add "be detailed and comprehensive" to constraints, or lower the min length threshold`;
+      return t("analyzeOutput.fixTooShort");
     }
     if (msgs.some((m) => m.includes("required") || m.includes("필수"))) {
-      return `Missing required fields. Add explicit output format example to the role prompt: "You MUST include these fields: ..."`;
+      return t("analyzeOutput.fixMissingFields");
     }
-    return `Validation rule mismatch. Review rules for "${stepId}" -- they may be too strict for this model's output style`;
+    return t("analyzeOutput.fixValidation");
   }
 
   if (type.includes("rate_limit")) {
-    return `Rate limits are causing retries that waste tokens. Solutions: (1) add delay between steps, (2) use a smaller model for eval steps, (3) reduce maxRetries`;
+    return t("analyzeOutput.fixRateLimit");
   }
 
   if (type.includes("timeout")) {
-    return `Network timeouts. Check connection stability or increase timeout settings`;
+    return t("analyzeOutput.fixTimeout");
   }
 
-  return `Review step "${stepId}" configuration and logs`;
+  return `${t("analyzeOutput.fixGeneral")} ("${stepId}")`;
 }
 
 function buildRules(type: string, stepId: string, instances: FailureInstance[], avgScore?: number, range?: { min: number; max: number }): GeneratedRule[] {
@@ -372,12 +375,12 @@ function renderContextProfile(events: TraceEvent[]): void {
   }
 
   if (waste.length > 0) {
-    console.log(chalk.bold("\n  Waste detected:\n"));
+    console.log(chalk.bold(`\n  ${t("analyzeOutput.wasteDetected")}\n`));
     for (const w of waste) console.log(chalk.yellow(`    ${w}`));
   }
 
   if (recommendations.length > 0) {
-    console.log(chalk.bold("\n  Recommendations:\n"));
+    console.log(chalk.bold(`\n  ${t("analyzeOutput.recommendations")}\n`));
     for (const r of recommendations) console.log(chalk.cyan(`    ${r}`));
   }
 
@@ -388,23 +391,23 @@ function renderContextProfile(events: TraceEvent[]): void {
 
 function renderClusters(clusters: FailureCluster[], traceCount: number): void {
   const totalFailures = clusters.reduce((s, c) => s + c.count, 0);
-  console.log(chalk.bold(`  ${totalFailures} failures in ${clusters.length} patterns:\n`));
+  console.log(chalk.bold(`  ${totalFailures}${t("analyzeOutput.failuresIn")}${clusters.length}${t("analyzeOutput.patterns")}\n`));
 
   for (const c of clusters) {
     const pctBar = chalk.red("#".repeat(Math.max(1, Math.round(c.percentage / 2))));
 
     console.log(chalk.bold(`  ${c.id} ${c.description}`));
-    console.log(`     ${c.count} occurrences (${c.percentage.toFixed(0)}% of failures) ${pctBar}`);
+    console.log(`     ${c.count}${t("analyzeOutput.occurrences")} (${c.percentage.toFixed(0)}% ${t("analyzeOutput.ofFailures")}) ${pctBar}`);
 
     if (c.scoreRange) {
-      console.log(chalk.dim(`     Score range: ${c.scoreRange.min.toFixed(2)} - ${c.scoreRange.max.toFixed(2)}, avg: ${c.avgScore?.toFixed(2)}`));
+      console.log(chalk.dim(`     ${t("analyzeOutput.scoreRange")}: ${c.scoreRange.min.toFixed(2)} - ${c.scoreRange.max.toFixed(2)}, avg: ${c.avgScore?.toFixed(2)}`));
     }
 
-    console.log(chalk.cyan(`     Fix: ${c.fix}`));
+    console.log(chalk.cyan(`     ${t("analyzeOutput.fix")}: ${c.fix}`));
 
     if (c.rules.length > 0) {
       for (const r of c.rules) {
-        console.log(chalk.yellow(`     Rule: ${r.filename} (${r.type})`));
+        console.log(chalk.yellow(`     ${t("analyzeOutput.rule")}: ${r.filename} (${r.type})`));
       }
     }
     console.log();
