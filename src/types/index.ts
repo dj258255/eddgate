@@ -8,7 +8,8 @@ export type StepState =
   | "generate"
   | "validate"
   | "transform"
-  | "human_approval";
+  | "human_approval"
+  | "record_decision";
 
 export interface Identity {
   role: string;
@@ -142,9 +143,20 @@ export type TraceEventType =
   | "step_end"
   | "llm_call"
   | "tool_call"
+  | "retrieval"
   | "validation"
   | "evaluation"
+  | "decision"
   | "error";
+
+// Retrieval result metadata for E2E trace
+export interface RetrievalChunk {
+  chunkId: string;
+  source: string;
+  url?: string;
+  score: number;
+  text?: string;
+}
 
 export interface TraceEvent {
   timestamp: string;
@@ -160,6 +172,8 @@ export interface TraceEvent {
     cost?: number;
     validationResult?: ValidationResult;
     evaluationResult?: EvaluationResult;
+    retrievalResults?: RetrievalChunk[];
+    decision?: { status: string; reason: string; outputPath?: string };
     output?: string;
     error?: string;
   };

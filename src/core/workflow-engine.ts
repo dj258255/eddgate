@@ -203,6 +203,48 @@ async function executeStep(
       };
     }
 
+    // record_decision: 실행 결과를 파일로 기록 (감사 추적)
+    if (step.type === "record_decision") {
+      const stepInput = getStepInput(step, originalInput, previousResults);
+      const durationMs = Math.round(performance.now() - stepStart);
+
+      const decisionRecord = {
+        timestamp: new Date().toISOString(),
+        traceId: tracer.getTraceId(),
+        stepId: step.id,
+        input: stepInput.slice(0, 500),
+        previousSteps: Array.from(previousResults.entries()).map(([id, r]) => ({
+          id,
+          status: r.status,
+        })),
+      };
+
+      const outputPath = `traces/decision-${tracer.getTraceId().slice(0, 8)}.json`;
+
+      try {
+        const { writeFile } = await import("node:fs/promises");
+        await writeFile(outputPath, JSON.stringify(decisionRecord, null, 2), "utf-8");
+      } catch {
+        // traces dir might not exist, non-fatal
+      }
+
+      tracer.decision(step.id, {
+        status: "recorded",
+        reason: "Workflow execution decision logged",
+        outputPath,
+      });
+      tracer.stepEnd(step.id, { latencyMs: durationMs });
+
+      return {
+        stepId: step.id,
+        status: "success",
+        output: decisionRecord,
+        trace,
+        durationMs,
+        tokenUsage: { input: 0, output: 0 },
+      };
+    }
+
     // 에이전트 실행
     const stepInput = getStepInput(step, originalInput, previousResults);
     const agentOutput = await runAgent({

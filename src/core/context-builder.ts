@@ -34,7 +34,14 @@ export function buildContext(
     tools: step.context.tools,
   };
 
-  // 이전 단계 결과 주입 (dependsOn이 있을 때만)
+  // Context Engineering: retrieve 단계에서는 실행 컨텍스트(이전 단계 결과)를
+  // 검색 쿼리에 포함하지 않는다. 검색은 근거 정보만 다뤄야 함.
+  // "실행 컨텍스트는 Search Query에 포함 금지" 규칙 코드 강제.
+  if (step.type === "retrieve") {
+    return ctx; // 이전 단계 결과 주입 없이 반환
+  }
+
+  // 이전 단계 결과 주입 (dependsOn이 있을 때만, retrieve 제외)
   if (step.dependsOn?.length) {
     const summaries: string[] = [];
 

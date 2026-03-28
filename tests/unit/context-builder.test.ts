@@ -69,6 +69,27 @@ describe("Context Builder", () => {
       expect(ctx.memory).toBeUndefined();
     });
 
+    it("does NOT inject memory for retrieve steps (Context Engineering rule)", () => {
+      const retrieveStep: StepDefinition = {
+        ...baseStep,
+        type: "retrieve",
+        dependsOn: ["prev_step"],
+        context: { ...baseStep.context, state: "retrieve" },
+      };
+      const prevResults = new Map<string, StepResult>();
+      prevResults.set("prev_step", {
+        stepId: "prev_step",
+        status: "success",
+        output: "some previous output",
+        trace: [],
+        durationMs: 100,
+        tokenUsage: { input: 10, output: 20 },
+      });
+
+      const ctx = buildContext(retrieveStep, prevResults, "sonnet");
+      expect(ctx.memory).toBeUndefined();
+    });
+
     it("truncates long outputs in summary", () => {
       const step = { ...baseStep, dependsOn: ["prev_step"] };
       const longOutput = "x".repeat(1000);

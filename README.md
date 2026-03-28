@@ -1,79 +1,103 @@
-# eddgate CLI
+# eddgate
 
-평가가 내장된 멀티에이전트 워크플로우 엔진.
+Evaluation-gated multi-agent workflow engine.
 
-[eddgate (Evaluation-Driven Development and Operations)](https://arxiv.org/abs/2411.13768) 원칙을 실용적으로 구현 — 코드가 워크플로우를 제어하고, 결정적 검증으로 품질을 보장합니다.
+Deterministic validation gates, structured traces, reproducible execution.
+Powered by Claude Agent SDK (Max subscription, no API key needed).
 
-## 핵심 특징
+## Core Features
 
-- **결정적 검증 게이트** — Zod 스키마 기반 Tier 1 검증 (오탐 0%, 5ms)
-- **LLM 평가 내장** — 핵심 전환점에서 groundedness/relevance 자동 평가
-- **재현 가능한 실행** — 같은 입력 → 같은 실행 경로
-- **검색↔생성 강제 분리** — 코드로 아키텍처 제약 강제
-- **구조화 트레이스** — JSONL + HTML 리포트 + TUI 대시보드
-- **Claude Code 연동** — Claude Agent SDK로 Max 구독 활용 (API 키 불필요)
+- **Deterministic validation gates** -- Zod schema-based Tier 1 checks (0% false positives, 5ms)
+- **LLM evaluation at key transitions** -- groundedness/relevance scoring at critical points
+- **Reproducible execution** -- same input produces same execution path
+- **Search/generation separation enforced** -- retrieve steps cannot access execution context (code-enforced)
+- **GenAIOps pipeline** -- build/evaluate/deploy/operate lifecycle fully covered
+- **Structured traces** -- JSONL + HTML report + TUI dashboard + Langfuse/OTel adapters
 
-## 설치
+## Install
 
 ```bash
 npm install -g eddgate
 ```
 
-**요구사항**: Node.js 20+, Claude Code CLI 설치 (Max/Pro 구독)
+Requirements: Node.js 20+, Claude Code CLI (Max/Pro subscription)
 
-## 빠른 시작
+## Quick Start
 
 ```bash
-# 워크플로우 목록 확인
-eddgate list workflows -d templates/workflows
-
-# 워크플로우 구조 미리보기
-eddgate run document-pipeline --dry-run -w templates/workflows
-
-# 실행
-eddgate run document-pipeline \
-  --input query.txt \
-  --output result.md \
-  --report report.html \
-  -w templates/workflows \
-  -p templates/prompts
-
-# TUI 대시보드로 결과 확인
-eddgate run document-pipeline \
-  --input query.txt \
-  --tui \
-  -w templates/workflows \
-  -p templates/prompts
+eddgate init                                    # scaffold project
+eddgate doctor                                  # check environment
+eddgate run example --input input.txt --dry-run # preview workflow
+eddgate run example --input input.txt           # execute workflow
 ```
 
-## 아키텍처
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `init` | Scaffold project structure |
+| `doctor` | Health check (Node, Claude CLI, config, graph validation) |
+| `run` | Execute workflow (--report, --tui, --json, --max-budget-usd) |
+| `step` | Run single step for debugging |
+| `trace` | View saved traces (summary or JSON) |
+| `eval` | Offline evaluation on saved traces |
+| `diff-eval` | Compare evaluation scores between git commits |
+| `gate` | Deployment gate check with configurable rules |
+| `monitor` | Aggregated metrics: status, cost by model/step, quality trends |
+| `version-diff` | Show prompt/workflow changes between commits |
+| `mcp` | Manage MCP servers (list/add/remove) |
+| `viz` | Workflow visualization (Mermaid/ASCII) |
+| `list` | List workflows and roles |
+
+## GenAIOps Pipeline
+
+eddgate covers the full GenAIOps lifecycle:
 
 ```
-코드가 제어 (결정적)          Claude가 실행 (Max 구독)
-─────────────────────       ────────────────────────
-Workflow Engine              query() → Claude Code CLI
- ├── 토폴로지 정렬            ├── 각 단계 LLM 호출
- ├── 의존성 해결              ├── 웹서칭, 파일 작업
- ├── Tier 1 Zod 검증         └── 구조화 출력 (JSON Schema)
- ├── Tier 2 LLM 평가
- ├── 재시도 로직
- └── 트레이스 기록
+build:    Git + version-diff        (prompt/workflow versioning)
+evaluate: eval + diff-eval          (offline evaluation + regression detection)
+deploy:   gate                      (configurable rules, CI integration)
+operate:  monitor + trace           (cost/quality/status aggregation)
 ```
 
-## 3-Tier 평가 모델
+## 3-Tier Evaluation
 
-| Tier | 방식 | 비용 | 타이밍 | 정확도 |
-|------|------|------|--------|--------|
-| **Tier 1** | 규칙 기반 (Zod) | $0 | 매 단계, 5ms | 100% (결정적) |
-| **Tier 2** | LLM-as-judge | ~$0.01/회 | 핵심 전환점만 | ~85% |
-| **Tier 3** | 오프라인 분석 | 가변 | 비동기 | 데이터셋 의존 |
+| Tier | Method | Cost | Timing | Accuracy |
+|------|--------|------|--------|----------|
+| 1 | Rule-based (Zod) | $0 | Every step, 5ms | 100% deterministic |
+| 2 | LLM-as-judge | ~$0.01/call | Key transitions only | ~85% |
+| 3 | Offline batch | Variable | Async (CI/CD) | Dataset-dependent |
 
-## 워크플로우 정의
+## Architecture
 
-YAML로 정의, Git으로 버전 관리:
+```
+Code controls (deterministic)        Claude executes (Max subscription)
+----------------------------        --------------------------------
+Workflow Engine                      query() via Claude Agent SDK
+  Topological sort                     LLM calls per step
+  Dependency resolution                Web search, file ops
+  Tier 1 Zod validation               Structured output (JSON Schema)
+  Tier 2 LLM evaluation
+  Budget control
+  Graph validation
+  Retry with exponential backoff
+  Trace recording
+```
+
+## Context Engineering
+
+Enforced rules in code, not just prompts:
+
+- **Retrieve steps cannot access execution context** -- search queries contain only the user's original input, preventing context leakage
+- **Minimal context** -- 100-token summaries instead of raw output (prevents context rot)
+- **Fixed execution context structure** -- state/identity/tools as reproducible JSON
+
+## Workflow Definition
+
+YAML files, Git-versioned:
 
 ```yaml
-name: "문서 파이프라인"
+name: "Document Pipeline"
 config:
   defaultModel: "sonnet"
   topology: "pipeline"
@@ -81,42 +105,104 @@ config:
 
 steps:
   - id: "classify"
-    name: "문제 구체화"
     type: "classify"
     context:
-      state: "classify"
       identity:
-        role: "problem_analyzer"
-        constraints: ["답변 섹션 제목 형태로 정리"]
+        role: "analyzer"
+        constraints: ["structured JSON output"]
       tools: []
     validation:
       rules:
         - type: "required_fields"
           spec: { fields: ["topics"] }
-          message: "topics 필수"
+          message: "topics required"
+
+  - id: "retrieve"
+    type: "retrieve"
+    dependsOn: ["classify"]
+    context:
+      identity:
+        role: "researcher"
+        constraints: ["official sources only"]
+      tools: ["web_search"]
+
+  - id: "generate"
+    type: "generate"
+    dependsOn: ["retrieve"]
+    evaluation:
+      enabled: true
+      type: "groundedness"
+      threshold: 0.7
+      onFail: "flag"
 ```
 
-## 기본 워크플로우
+## Step Types
 
-| 워크플로우 | 단계 | 용도 |
-|-----------|------|------|
-| `document-pipeline` | 8 | 문의 분석 → 링크 수집 → 답변 생성 → 검증 |
-| `code-review` | 3 | 변경 분석 → 이슈 탐지 → 리뷰 리포트 |
-| `bug-fix` | 4 | 재현 → 원인 분석 → 수정 → 검증 |
+| Type | Description |
+|------|-------------|
+| `classify` | Analyze and categorize input |
+| `retrieve` | Search for evidence (context isolation enforced) |
+| `generate` | Produce output content |
+| `validate` | Check output quality (no modification) |
+| `transform` | Restructure without changing content |
+| `human_approval` | Wait for human approve/deny |
+| `record_decision` | Log execution result for audit trail |
 
-## 출력
+## Deployment Gate
 
-- **stdout** — 실시간 실행 로그
-- **JSONL** — 구조화 트레이스 (`--trace-jsonl`)
-- **HTML** — 시각적 리포트 (`--report`)
-- **TUI** — 인터랙티브 터미널 대시보드 (`--tui`)
+```yaml
+# gate-rules.yaml
+rules:
+  - metric: "avg_score"
+    condition: ">= 0.75"
+  - metric: "pass_rate"
+    condition: ">= 0.8"
+  - metric: "groundedness_avg"
+    condition: ">= 0.7"
+```
 
-## 배경
+```bash
+eddgate eval my-workflow --output results.json
+eddgate gate --results results.json --rules gate-rules.yaml
+```
 
-- [RESEARCH_ANALYSIS.md](RESEARCH_ANALYSIS.md) — 논문 40+편, 프레임워크 16개 시장 분석
-- [CRITICAL_ANALYSIS.md](CRITICAL_ANALYSIS.md) — 비관적 분석: "왜 안 만들었는가"
-- [ARCHITECTURE.md](ARCHITECTURE.md) — 아키텍처 스펙 및 설계 근거
+## Monitoring
 
-## 라이선스
+```bash
+eddgate monitor status -p 7d    # success rate, latency, tokens, cost
+eddgate monitor cost -p 30d     # cost breakdown by model and step
+eddgate monitor quality -p 7d   # evaluation score trends
+```
+
+## Built-in Workflows
+
+| Workflow | Steps | Use Case |
+|----------|-------|----------|
+| document-pipeline | 8 | Query analysis, link collection, answer generation, validation |
+| code-review | 3 | Diff analysis, issue detection, review report |
+| bug-fix | 4 | Reproduce, root cause, fix, verify |
+| api-design | 3 | Requirements, endpoint design, documentation |
+| translation | 3 | Source analysis, translation, quality check |
+
+## Output Formats
+
+- **stdout** -- real-time execution log
+- **JSONL** -- structured trace (--trace-jsonl)
+- **HTML** -- visual report with dark mode (--report)
+- **TUI** -- interactive terminal dashboard (--tui)
+- **JSON** -- machine-readable output (--json)
+
+## Trace Adapters
+
+- **Langfuse** -- auto-enabled via LANGFUSE_PUBLIC_KEY/LANGFUSE_SECRET_KEY
+- **OpenTelemetry** -- compatible with Jaeger, Grafana Tempo, Datadog
+
+## Research
+
+- [RESEARCH_ANALYSIS.md](RESEARCH_ANALYSIS.md) -- 40+ papers, 16 frameworks analysis
+- [CRITICAL_ANALYSIS.md](CRITICAL_ANALYSIS.md) -- pessimistic validation of each feature
+- [ARCHITECTURE.md](ARCHITECTURE.md) -- architecture spec and design rationale
+
+## License
 
 MIT

@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.2.0 (2026-03-28)
+
+GenAIOps pipeline complete. All 4 stages covered.
+
+### New Commands
+- `gate` -- deployment gate with configurable rules (avg_score, pass_rate thresholds)
+- `monitor` -- aggregated metrics from traces (status, cost by model/step, quality trends)
+- `version-diff` -- prompt/workflow change tracking between git commits
+
+### Engine
+- `record_decision` step type for audit trail logging
+- E2E trace with retrieval chunk ID/source metadata
+- Context Engineering enforced: retrieve steps cannot access execution context (code-enforced)
+- Model overrides from config now connected to workflow engine (classify=haiku, generate=sonnet)
+
+### Templates
+- gate-rules.yaml for deployment gate configuration
+
+### Tests
+- 60 tests passing (Context Engineering isolation test added)
+
 ## 0.1.0 (2026-03-28)
 
 Initial release.

@@ -129,6 +129,20 @@ export class TraceEmitter {
     return this.emit(stepId, "evaluation", { evaluationResult: result });
   }
 
+  retrieval(
+    stepId: string,
+    chunks: Array<{ chunkId: string; source: string; url?: string; score: number; text?: string }>,
+  ): TraceEvent {
+    return this.emit(stepId, "retrieval", { retrievalResults: chunks });
+  }
+
+  decision(
+    stepId: string,
+    info: { status: string; reason: string; outputPath?: string },
+  ): TraceEvent {
+    return this.emit(stepId, "decision", { decision: info });
+  }
+
   error(stepId: string, error: string): TraceEvent {
     return this.emit(stepId, "error", { error });
   }

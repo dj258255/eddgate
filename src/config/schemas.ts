@@ -9,6 +9,7 @@ const stepStateSchema = z.enum([
   "validate",
   "transform",
   "human_approval",
+  "record_decision",
 ]);
 
 const identitySchema = z.object({

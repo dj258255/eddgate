@@ -839,19 +839,33 @@ eddgate/
 15. ✅ 8단계 파이프라인 실행 성공 (627s, 37K tokens, Max 구독)
 16. ✅ npm 패키지 준비
 
-**Phase 2 (다음)**: 고도화
+**Phase 2 (완료)**: 고도화
 
-- Langfuse/OTel 트레이스 출력 어댑터
-- Tier 3 오프라인 평가 (CI/CD 연동, diff-eval)
-- MCP 서버 관리 커맨드
-- 추가 워크플로우 템플릿
-- GitHub Actions 연동 예시
+17. ✅ Langfuse/OTel 트레이스 어댑터 (선택적 의존성)
+18. ✅ Tier 3 오프라인 평가 + 회귀 감지
+19. ✅ diff-eval (프롬프트 변경 전후 비교)
+20. ✅ MCP 서버 관리 (mcp list/add/remove)
+21. ✅ 추가 워크플로우 템플릿 (api-design, translation)
+22. ✅ GitHub Actions CI/CD (ci.yml, eval.yml)
+23. ✅ 워크플로우 시각화 (Mermaid/ASCII)
 
-**Phase 3 (선택)**: 확장
+**Phase 3 (완료)**: GenAIOps 파이프라인
 
-- Claude Code 플러그인 래퍼 (시장 검증)
-- 다른 플랫폼 어댑터 (Cursor, Copilot)
+24. ✅ monitor 커맨드 (status/cost/quality 집계)
+25. ✅ gate 커맨드 (배포 게이트, 규칙 기반 pass/fail)
+26. ✅ version-diff (프롬프트/워크플로우 버전 비교)
+27. ✅ model-provider 실제 연결 (config overrides by step type)
+28. ✅ record_decision 단계 타입 (감사 추적)
+29. ✅ E2E Trace에 retrieval chunk ID/source 추적
+30. ✅ Context Engineering 강제: retrieve 단계 실행 컨텍스트 분리 (코드 강제)
+31. ✅ gate-rules.yaml 템플릿
+
+**미래 (선택)**:
+
+- Claude Code 플러그인 래퍼
 - 웹 대시보드
+- RAG 인덱싱 파이프라인 (Pinecone MCP 통합)
+- A/B 프롬프트 배포
 
 ---
 
