@@ -28,6 +28,7 @@ export interface LLMAdapter {
     prompt: string;
     tools?: string[];
     effort?: string;
+    thinking?: string;
   }): Promise<LLMResponse>;
 
   /**
@@ -52,12 +53,20 @@ export class ClaudeSDKAdapter implements LLMAdapter {
     prompt: string;
     tools?: string[];
     effort?: string;
+    thinking?: string;
   }): Promise<LLMResponse> {
     const { query } = await import("@anthropic-ai/claude-agent-sdk");
 
     const model = resolveModel(options.model);
     const allowedTools = options.tools?.length ? mapTools(options.tools) : undefined;
     const effort = options.effort as "low" | "medium" | "high" | "max" | undefined;
+
+    // Thinking mode
+    const thinkingOption = options.thinking === "adaptive"
+      ? { type: "adaptive" as const }
+      : options.thinking === "enabled"
+        ? { type: "enabled" as const, budgetTokens: 10000 }
+        : undefined;
 
     const start = performance.now();
 
@@ -76,6 +85,7 @@ export class ClaudeSDKAdapter implements LLMAdapter {
         persistSession: false,
         tools: !options.tools?.length ? [] : undefined,
         ...(effort ? { effort } : {}),
+        ...(thinkingOption ? { thinking: thinkingOption } : {}),
       },
     });
 

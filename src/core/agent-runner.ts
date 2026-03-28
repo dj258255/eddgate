@@ -16,6 +16,7 @@ import { createDefaultAdapter } from "./llm-adapter.js";
 let defaultAdapter: LLMAdapter | null = null;
 
 let globalEffort: string | undefined;
+let globalThinking: string | undefined;
 
 export function setAdapter(adapter: LLMAdapter): void {
   defaultAdapter = adapter;
@@ -23,6 +24,10 @@ export function setAdapter(adapter: LLMAdapter): void {
 
 export function setEffort(effort: string): void {
   globalEffort = effort;
+}
+
+export function setThinking(thinking: string): void {
+  globalThinking = thinking;
 }
 
 function getAdapter(): LLMAdapter {
@@ -72,6 +77,7 @@ export async function runAgent(
         prompt: fullInput,
         tools: context.tools.length > 0 ? context.tools : undefined,
         effort: globalEffort,
+        thinking: globalThinking,
       });
 
       tracer.llmCall(stepId, {

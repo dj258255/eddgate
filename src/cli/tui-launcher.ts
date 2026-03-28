@@ -3,12 +3,14 @@ import { readdir } from "node:fs/promises";
 import { resolve, extname, basename } from "node:path";
 import chalk from "chalk";
 import { pickFile } from "./file-picker.js";
+import { MODELS, EFFORTS, THINKING_OPTIONS } from "./models.js";
 
 export interface LaunchResult {
   workflow: string;
   input: string;
   model: string;
   effort: string;
+  thinking: string;
   maxBudgetUsd?: number;
   report?: string;
   traceJsonl?: string;
@@ -68,7 +70,7 @@ const t: Record<Lang, Record<string, string>> = {
 
 export async function tuilauncher(): Promise<LaunchResult> {
   const cancelled = (): LaunchResult => ({
-    workflow: "", input: "", model: "sonnet", effort: "medium",
+    workflow: "", input: "", model: "sonnet", effort: "medium", thinking: "disabled",
     workflowsDir: ".", promptsDir: ".", cancelled: true,
   });
 
@@ -135,28 +137,40 @@ export async function tuilauncher(): Promise<LaunchResult> {
   if (p.isCancel(input)) { p.cancel(l.cancelled); return cancelled(); }
 
   // Model
+  const isKo = lang === "ko";
   const model = await p.select({
     message: l.model,
-    options: [
-      { value: "sonnet", label: "sonnet", hint: l.sonnet },
-      { value: "opus", label: "opus", hint: l.opus },
-      { value: "haiku", label: "haiku", hint: l.haiku },
-    ],
+    options: MODELS.map((m) => ({
+      value: m.value,
+      label: m.label,
+      hint: isKo ? m.hintKo : m.hint,
+    })),
   });
   if (p.isCancel(model)) { p.cancel(l.cancelled); return cancelled(); }
 
   // Effort
   const effort = await p.select({
     message: l.effort,
-    options: [
-      { value: "low", label: "low", hint: l.low },
-      { value: "medium", label: "medium", hint: l.medium },
-      { value: "high", label: "high", hint: l.high },
-      { value: "max", label: "max", hint: l.max },
-    ],
+    options: EFFORTS.map((e) => ({
+      value: e.value,
+      label: e.label,
+      hint: isKo ? e.hintKo : e.hint,
+    })),
     initialValue: "medium",
   });
   if (p.isCancel(effort)) { p.cancel(l.cancelled); return cancelled(); }
+
+  // Extended Thinking
+  const thinking = await p.select({
+    message: isKo ? "확장 사고" : "Extended thinking",
+    options: THINKING_OPTIONS.map((t) => ({
+      value: t.value,
+      label: t.label,
+      hint: isKo ? t.hintKo : t.hint,
+    })),
+    initialValue: "disabled",
+  });
+  if (p.isCancel(thinking)) { p.cancel(l.cancelled); return cancelled(); }
 
   // Optional settings
   const budget = await p.text({ message: l.budget, defaultValue: "" });
@@ -184,6 +198,7 @@ export async function tuilauncher(): Promise<LaunchResult> {
     input: input as string,
     model: model as string,
     effort: effort as string,
+    thinking: thinking as string,
     maxBudgetUsd: (budget as string).trim() ? parseFloat(budget as string) : undefined,
     report: (report as string).trim() || undefined,
     traceJsonl: (trace as string).trim() || undefined,

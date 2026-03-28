@@ -97,6 +97,11 @@ async function launchTUI(): Promise<void> {
     setEffort(result.effort);
   }
 
+  if (result.thinking && result.thinking !== "disabled") {
+    const { setThinking } = await import("../core/agent-runner.js");
+    setThinking(result.thinking);
+  }
+
   await runCommand(result.workflow, {
     input: result.input,
     model: result.model,
@@ -243,13 +248,10 @@ async function tuiConfigManager(p: typeof import("@clack/prompts")): Promise<voi
   if (p.isCancel(setting)) return;
 
   if (setting === "model") {
+    const { MODELS: modelList } = await import("./models.js");
     const newModel = await p.select({
       message: "Default model",
-      options: [
-        { value: "sonnet", label: "sonnet", hint: "balanced" },
-        { value: "opus", label: "opus", hint: "most capable" },
-        { value: "haiku", label: "haiku", hint: "fast and cheap" },
-      ],
+      options: modelList.map((m) => ({ value: m.value, label: m.label, hint: m.hint })),
       initialValue: (model.default as string) ?? "sonnet",
     });
     if (p.isCancel(newModel)) return;
