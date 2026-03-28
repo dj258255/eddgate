@@ -5,6 +5,7 @@ import { initLang, t } from "../i18n/index.js";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { blessedSelect, blessedInput, blessedConfirm, blessedMessage } from "./blessed-prompts.js";
 import { blessedFileBrowser } from "./blessed-file-browser.js";
+import { getClaudePlugins, getClaudeMcpServers, formatPluginList, formatMcpList } from "./claude-integration.js";
 import { MODELS, EFFORTS, THINKING_OPTIONS } from "./models.js";
 
 /**
@@ -656,22 +657,35 @@ async function renderTestPanel(): Promise<string> {
 }
 
 async function renderMcpPanel(): Promise<string> {
-  let servers: string[] = [];
+  // eddgate config servers
+  let eddgateServers: string[] = [];
   try {
     const raw = await readFile(resolve("./eddgate.config.yaml"), "utf-8");
     const config = parseYaml(raw) as Record<string, unknown>;
     const mcp = config.mcp as { servers?: Array<Record<string, unknown>> } | undefined;
-    servers = (mcp?.servers ?? []).map((s) => `${s.name} (${s.transport})`);
+    eddgateServers = (mcp?.servers ?? []).map((s) => `${s.name} (${s.transport})`);
   } catch { /* */ }
+
+  // Claude Code MCP servers
+  const claudeServers = await getClaudeMcpServers();
+
   const lines = [
     "", `  {bold}{magenta-fg}${t("panel.mcpTitle")}{/magenta-fg}{/bold}`, "",
-    `  {bold}${t("panel.configured")}{/bold}  ${servers.length}`, "",
+    `  {bold}eddgate:{/bold}  ${eddgateServers.length}`,
   ];
-  if (servers.length > 0) {
-    for (const s of servers) lines.push(`    {magenta-fg}>{/magenta-fg} ${s}`);
+  if (eddgateServers.length > 0) {
+    for (const s of eddgateServers) lines.push(`    {magenta-fg}>{/magenta-fg} ${s}`);
   } else {
     lines.push(`    {gray-fg}${t("panel.noServers")}{/gray-fg}`);
   }
+
+  lines.push("", `  {bold}Claude Code:{/bold}  ${claudeServers.length}`);
+  if (claudeServers.length > 0) {
+    lines.push(formatMcpList(claudeServers));
+  } else {
+    lines.push("    {gray-fg}No Claude Code MCP servers found.{/gray-fg}");
+  }
+
   lines.push("", `  {gray-fg}${t("panel.pressEnterManage")}{/gray-fg}`);
   return lines.join("\n");
 }
@@ -705,6 +719,9 @@ async function renderPluginsPanel(): Promise<string> {
     } catch { continue; }
   }
 
+  // Claude Code plugins
+  const claudePlugins = await getClaudePlugins();
+
   const lines = [
     "", `  {bold}{white-fg}${t("panel.pluginsTitle")}{/white-fg}{/bold}`, "",
     `  {bold}${t("panel.workflows")}{/bold}  ${wfs.length}`,
@@ -713,6 +730,13 @@ async function renderPluginsPanel(): Promise<string> {
 
   lines.push("", `  {bold}Roles:{/bold}  ${roles.length}`);
   for (const r of roles) lines.push(`    {cyan-fg}>{/cyan-fg} ${r}`);
+
+  lines.push("", `  {bold}Claude Code Plugins:{/bold}  ${claudePlugins.length}`);
+  if (claudePlugins.length > 0) {
+    lines.push(formatPluginList(claudePlugins));
+  } else {
+    lines.push("    {gray-fg}No Claude Code plugins found.{/gray-fg}");
+  }
 
   lines.push(
     "", `  {bold}${t("panel.actions")}{/bold}`,
