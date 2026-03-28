@@ -600,16 +600,21 @@ async function updateContent(index: number): Promise<void> {
 async function renderRunPanel(): Promise<string> {
   const wfs = await findWorkflows("./workflows").then((w) => w.length > 0 ? w : findWorkflows("./templates/workflows"));
   const lines = [
-    "", "  {bold}{cyan-fg}Run a Workflow{/cyan-fg}{/bold}", "",
-    "  {gray-fg}The self-improving loop:{/gray-fg}",
-    "  {cyan-fg}run{/cyan-fg} -> {yellow-fg}analyze{/yellow-fg} -> {green-fg}test{/green-fg} -> {cyan-fg}run{/cyan-fg} (improved)", "",
-    "  {bold}Workflows:{/bold}",
+    "", `  {bold}{cyan-fg}${t("panel.runTitle")}{/cyan-fg}{/bold}`, "",
+    `  {gray-fg}${t("panel.loopDesc")}{/gray-fg}`,
+    "  {cyan-fg}run{/cyan-fg} -> {yellow-fg}analyze{/yellow-fg} -> {green-fg}test{/green-fg} -> {cyan-fg}run{/cyan-fg}", "",
+    `  {bold}${t("panel.workflows")}{/bold}`,
   ];
   for (const wf of wfs) {
     const steps = await getStepCount(wf);
-    lines.push(`    {cyan-fg}>{/cyan-fg} ${wf}  {gray-fg}(${steps} steps){/gray-fg}`);
+    lines.push(`    {cyan-fg}>{/cyan-fg} ${wf}  {gray-fg}(${steps} ${t("panel.steps")}){/gray-fg}`);
   }
-  lines.push("", "  {gray-fg}Press Enter to configure and run.{/gray-fg}");
+  lines.push(
+    "", `  {bold}${t("panel.gates")}{/bold}`,
+    `    ${t("panel.tier1")}  {green-fg}${t("panel.tier1Hint")}{/green-fg}`,
+    `    ${t("panel.tier2")}  {yellow-fg}${t("panel.tier2Hint")}{/yellow-fg}`,
+    "", `  {gray-fg}${t("panel.pressEnterRun")}{/gray-fg}`,
+  );
   return lines.join("\n");
 }
 
@@ -620,13 +625,15 @@ async function renderAnalyzePanel(): Promise<string> {
     count = files.filter((f) => f.endsWith(".jsonl")).length;
   } catch { /* */ }
   return [
-    "", "  {bold}{yellow-fg}Analyze Failures{/yellow-fg}{/bold}", "",
-    `  {bold}Traces:{/bold}  ${count} file(s)`, "",
-    "  {bold}Features:{/bold}",
-    "    {yellow-fg}>{/yellow-fg} Cluster failure patterns",
-    "    {yellow-fg}>{/yellow-fg} Auto-generate validation rules",
-    "    {yellow-fg}>{/yellow-fg} Context window profiler", "",
-    "  {gray-fg}Press Enter to analyze.{/gray-fg}",
+    "", `  {bold}{yellow-fg}${t("panel.analyzeTitle")}{/yellow-fg}{/bold}`, "",
+    `  {bold}${t("panel.traces")}{/bold}  ${count} ${t("panel.files")}`, "",
+    `  {bold}${t("panel.features")}{/bold}`,
+    `    {yellow-fg}>{/yellow-fg} ${t("panel.clusterPatterns")}`,
+    `    {yellow-fg}>{/yellow-fg} ${t("panel.autoGenRules")}`,
+    `    {yellow-fg}>{/yellow-fg} ${t("panel.contextProfiler")}`, "",
+    `  {bold}${t("panel.loopConnection")}{/bold}`,
+    `    {gray-fg}${t("panel.rulesAutoLoaded")}{/gray-fg}`, "",
+    `  {gray-fg}${t("panel.pressEnterAnalyze")}{/gray-fg}`,
   ].join("\n");
 }
 
@@ -637,12 +644,14 @@ async function renderTestPanel(): Promise<string> {
     count = files.filter((f) => f.endsWith(".json")).length;
   } catch { /* */ }
   return [
-    "", "  {bold}{green-fg}Regression Testing{/green-fg}{/bold}", "",
-    `  {bold}Snapshots:{/bold}  ${count}`, "",
-    "  {green-fg}snapshot{/green-fg}  Save baseline",
-    "  {green-fg}diff{/green-fg}      Compare against baseline",
-    "  {green-fg}list{/green-fg}      Show snapshots", "",
-    "  {gray-fg}Press Enter to manage.{/gray-fg}",
+    "", `  {bold}{green-fg}${t("panel.testTitle")}{/green-fg}{/bold}`, "",
+    `  {bold}${t("panel.snapshots")}{/bold}  ${count}`, "",
+    `  {green-fg}snapshot{/green-fg}  ${t("panel.snapshotDesc")}`,
+    `  {green-fg}diff{/green-fg}      ${t("panel.diffDesc")}`,
+    `  {green-fg}list{/green-fg}      ${t("panel.listDesc")}`, "",
+    `  {bold}${t("panel.ciIntegration")}{/bold}`,
+    `    {red-fg}${t("panel.exitOnRegression")}{/red-fg}`, "",
+    `  {gray-fg}${t("panel.pressEnterTest")}{/gray-fg}`,
   ].join("\n");
 }
 
@@ -655,15 +664,15 @@ async function renderMcpPanel(): Promise<string> {
     servers = (mcp?.servers ?? []).map((s) => `${s.name} (${s.transport})`);
   } catch { /* */ }
   const lines = [
-    "", "  {bold}{magenta-fg}MCP Servers{/magenta-fg}{/bold}", "",
-    `  {bold}Configured:{/bold}  ${servers.length}`, "",
+    "", `  {bold}{magenta-fg}${t("panel.mcpTitle")}{/magenta-fg}{/bold}`, "",
+    `  {bold}${t("panel.configured")}{/bold}  ${servers.length}`, "",
   ];
   if (servers.length > 0) {
     for (const s of servers) lines.push(`    {magenta-fg}>{/magenta-fg} ${s}`);
   } else {
-    lines.push("    {gray-fg}No servers.{/gray-fg}");
+    lines.push(`    {gray-fg}${t("panel.noServers")}{/gray-fg}`);
   }
-  lines.push("", "  {gray-fg}Press Enter to manage.{/gray-fg}");
+  lines.push("", `  {gray-fg}${t("panel.pressEnterManage")}{/gray-fg}`);
   return lines.join("\n");
 }
 
@@ -676,10 +685,10 @@ async function renderSettingsPanel(): Promise<string> {
     lang = (config.language as string) ?? "en";
   } catch { /* */ }
   return [
-    "", "  {bold}{blue-fg}Settings{/blue-fg}{/bold}", "",
+    "", `  {bold}{blue-fg}${t("panel.settingsTitle")}{/blue-fg}{/bold}`, "",
     `  {bold}Model:{/bold}     ${model}`,
     `  {bold}Language:{/bold}  ${lang === "ko" ? "한국어" : "English"}`, "",
-    "  {gray-fg}Press Enter to modify.{/gray-fg}",
+    `  {gray-fg}${t("panel.pressEnterModify")}{/gray-fg}`,
   ].join("\n");
 }
 
@@ -697,8 +706,8 @@ async function renderPluginsPanel(): Promise<string> {
   }
 
   const lines = [
-    "", "  {bold}{white-fg}Plugins{/white-fg}{/bold}", "",
-    `  {bold}Workflows:{/bold}  ${wfs.length}`,
+    "", `  {bold}{white-fg}${t("panel.pluginsTitle")}{/white-fg}{/bold}`, "",
+    `  {bold}${t("panel.workflows")}{/bold}  ${wfs.length}`,
   ];
   for (const wf of wfs) lines.push(`    {cyan-fg}>{/cyan-fg} ${wf}`);
 
@@ -706,10 +715,10 @@ async function renderPluginsPanel(): Promise<string> {
   for (const r of roles) lines.push(`    {cyan-fg}>{/cyan-fg} ${r}`);
 
   lines.push(
-    "", "  {bold}Actions:{/bold}",
-    "    Import workflow (from file)",
-    "    Import role (from file)", "",
-    "  {gray-fg}Press Enter to manage.{/gray-fg}",
+    "", `  {bold}${t("panel.actions")}{/bold}`,
+    `    ${t("panel.importWorkflow")}`,
+    `    ${t("panel.importRole")}`, "",
+    `  {gray-fg}${t("panel.pressEnterManage")}{/gray-fg}`,
   );
   return lines.join("\n");
 }

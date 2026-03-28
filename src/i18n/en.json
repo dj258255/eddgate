@@ -95,5 +95,50 @@
     "setJsonl": "Set JSONL trace directory",
     "configureLangfuse": "Configure Langfuse",
     "languageSet": "Language set to English."
+  },
+  "panel": {
+    "runTitle": "Run a Workflow",
+    "loopDesc": "The self-improving loop:",
+    "workflows": "Workflows:",
+    "steps": "steps",
+    "gates": "Validation gates:",
+    "tier1": "Tier 1: Zod schema",
+    "tier1Hint": "(0% false positive, 5ms)",
+    "tier2": "Tier 2: LLM judge",
+    "tier2Hint": "(key transitions only)",
+    "pressEnterRun": "Press Enter to configure and run.",
+
+    "analyzeTitle": "Analyze Failures",
+    "traces": "Traces:",
+    "files": "file(s)",
+    "features": "Features:",
+    "clusterPatterns": "Cluster failure patterns",
+    "autoGenRules": "Auto-generate validation rules",
+    "contextProfiler": "Context window profiler",
+    "loopConnection": "Loop connection:",
+    "rulesAutoLoaded": "Generated rules auto-loaded on next run",
+    "pressEnterAnalyze": "Press Enter to analyze.",
+
+    "testTitle": "Regression Testing",
+    "snapshots": "Snapshots:",
+    "snapshotDesc": "Save baseline",
+    "diffDesc": "Compare against baseline",
+    "listDesc": "Show snapshots",
+    "ciIntegration": "CI integration:",
+    "exitOnRegression": "exit 1 on regression detected",
+    "pressEnterTest": "Press Enter to manage.",
+
+    "mcpTitle": "MCP Servers",
+    "configured": "Configured:",
+    "noServers": "No servers.",
+    "actions": "Actions:",
+    "pressEnterManage": "Press Enter to manage.",
+
+    "pluginsTitle": "Plugins",
+    "importWorkflow": "Import workflow (from file)",
+    "importRole": "Import role (from file)",
+
+    "settingsTitle": "Settings",
+    "pressEnterModify": "Press Enter to modify."
   }
 }

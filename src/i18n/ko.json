@@ -95,5 +95,50 @@
     "setJsonl": "JSONL 트레이스 디렉토리 설정",
     "configureLangfuse": "Langfuse 설정",
     "languageSet": "언어가 한국어로 설정되었습니다."
+  },
+  "panel": {
+    "runTitle": "워크플로우 실행",
+    "loopDesc": "자가 개선 루프:",
+    "workflows": "워크플로우:",
+    "steps": "단계",
+    "gates": "검증 게이트:",
+    "tier1": "Tier 1: Zod 스키마",
+    "tier1Hint": "(0% 오탐, 5ms)",
+    "tier2": "Tier 2: LLM 평가",
+    "tier2Hint": "(핵심 전환점만)",
+    "pressEnterRun": "Enter를 눌러 설정하고 실행하세요.",
+
+    "analyzeTitle": "실패 분석",
+    "traces": "트레이스:",
+    "files": "개 파일",
+    "features": "기능:",
+    "clusterPatterns": "실패 패턴 클러스터링",
+    "autoGenRules": "검증 규칙 자동 생성",
+    "contextProfiler": "컨텍스트 윈도우 프로파일러",
+    "loopConnection": "루프 연결:",
+    "rulesAutoLoaded": "생성된 규칙이 다음 실행에 자동 적용",
+    "pressEnterAnalyze": "Enter를 눌러 분석하세요.",
+
+    "testTitle": "회귀 테스트",
+    "snapshots": "스냅샷:",
+    "snapshotDesc": "기준선 저장",
+    "diffDesc": "기준선과 비교",
+    "listDesc": "스냅샷 목록",
+    "ciIntegration": "CI 연동:",
+    "exitOnRegression": "회귀 감지 시 exit 1 반환",
+    "pressEnterTest": "Enter를 눌러 관리하세요.",
+
+    "mcpTitle": "MCP 서버",
+    "configured": "설정됨:",
+    "noServers": "서버 없음.",
+    "actions": "작업:",
+    "pressEnterManage": "Enter를 눌러 관리하세요.",
+
+    "pluginsTitle": "플러그인",
+    "importWorkflow": "워크플로우 가져오기 (파일에서)",
+    "importRole": "역할 가져오기 (파일에서)",
+
+    "settingsTitle": "설정",
+    "pressEnterModify": "Enter를 눌러 수정하세요."
   }
 }
