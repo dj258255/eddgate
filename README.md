@@ -172,14 +172,30 @@ Run `eddgate` for the full-screen terminal UI. Everything is accessible from men
 
 | Menu | What it does |
 |------|-------------|
-| **Run** | Select workflow, model, effort, thinking mode, input file/text. Live dashboard shows step progress (left panel) + streaming log (right panel). Header tracks elapsed time, tokens, cost. |
-| **Analyze** | Choose context profiler or failure analysis. Results displayed in-screen with split view. |
+| **Run** | Select workflow, model, effort, thinking mode, input. Configure run options (HTML report, JSONL trace, budget limit, dry run). Live dashboard during execution. Results panel with step table after completion. |
+| **Analyze** | Choose context profiler or failure analysis. Results displayed in-screen. |
 | **Test** | Snapshot current behavior, diff against baseline, or list saved snapshots. |
+| **Monitor** | Status overview (success rate gauge, metrics table), cost breakdown (bar chart by model, table by step), quality scores (eval averages with distribution bars). All from saved traces. |
+| **Traces** | Browse saved trace files. Select one to view: steps summary (left) + full event timeline (right) with color-coded events, token counts, scores. |
 | **MCP** | Add/remove/list MCP servers without editing YAML. |
 | **Plugins** | View installed workflows, roles, Claude Code plugins. Import from file browser. |
 | **Settings** | Change default model, language (Korean/English), trace config. |
 
 Keyboard: Arrow keys navigate, Enter selects, Esc goes back, q quits, Tab switches panels.
+
+### Run options
+
+After selecting workflow/model/effort/thinking, a run options menu lets you configure:
+
+| Option | What it does |
+|--------|-------------|
+| **Start run** | Proceed with current settings. |
+| **Save HTML report** | Enter path -- generates dark-mode HTML report after execution. |
+| **Save JSONL trace** | Enter path -- records all events during execution. |
+| **Set budget limit** | Enter USD amount -- stops workflow if cost exceeds limit. |
+| **Dry run** | Toggle on to preview workflow structure without executing. |
+
+Options loop back so you can set multiple before starting.
 
 ### Run dashboard
 
