@@ -18,6 +18,7 @@ import type { WorkflowResult } from "../../types/index.js";
 
 interface RunOptions {
   input?: string;
+  model?: string;
   config: string;
   workflowsDir: string;
   rolesDir: string;
@@ -45,6 +46,11 @@ export async function runCommand(
     );
     console.log(chalk.dim(`워크플로우 로드: ${workflowPath}`));
     const workflow = await loadWorkflow(workflowPath);
+
+    // CLI --model 오버라이드
+    if (options.model) {
+      workflow.config.defaultModel = options.model;
+    }
 
     // 프로젝트 설정 로드 (선택적)
     let projectConfig;
