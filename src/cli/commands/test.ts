@@ -183,6 +183,14 @@ async function runDiff(options: TestOptions): Promise<void> {
   console.log(`    Improvements: ${improvements.length}`);
   console.log(`    Changes:      ${changes.length}`);
 
+  // Show split view if TTY
+  if (process.stdout.isTTY && diffs.length > 0) {
+    try {
+      const { showDiffView } = await import("../split-view.js");
+      await showDiffView(diffs);
+    } catch { /* split view not available */ }
+  }
+
   if (regressions.length > 0) {
     console.log(chalk.red("\n  FAIL: Regressions detected.\n"));
     process.exit(1);

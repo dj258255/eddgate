@@ -73,6 +73,25 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
 
   if (options.generateRules) {
     await generateRuleFiles(clusters, options.output ?? "./eval/rules");
+
+    // Show split view if TTY (patterns left, rules right)
+    if (process.stdout.isTTY) {
+      try {
+        const { showRulePreview } = await import("../split-view.js");
+        await showRulePreview(
+          clusters.map((c) => ({
+            id: c.id,
+            description: c.description,
+            count: c.count,
+            percentage: c.percentage,
+            fix: c.fix,
+            ruleYaml: c.rules.map((r) =>
+              `type: "${r.type}"\nspec:\n${Object.entries(r.spec).map(([k, v]) => `  ${k}: ${JSON.stringify(v)}`).join("\n")}\nmessage: "${r.message}"`
+            ).join("\n---\n"),
+          })),
+        );
+      } catch { /* split view not available */ }
+    }
   }
 }
 
