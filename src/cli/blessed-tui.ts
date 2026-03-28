@@ -4,6 +4,7 @@ import { resolve, extname, basename } from "node:path";
 import { initLang, t } from "../i18n/index.js";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { blessedSelect, blessedInput, blessedConfirm, blessedMessage } from "./blessed-prompts.js";
+import { blessedFileBrowser } from "./blessed-file-browser.js";
 import { MODELS, EFFORTS, THINKING_OPTIONS } from "./models.js";
 
 /**
@@ -51,6 +52,7 @@ export async function launchBlessedTUI(): Promise<void> {
       `  ${t("menu.analyze")}`,
       `  ${t("menu.test")}`,
       `  ${t("menu.mcp")}`,
+      `  Plugins`,
       `  ${t("menu.config")}`,
       `  ${t("menu.exit")}`,
     ],
@@ -82,7 +84,7 @@ export async function launchBlessedTUI(): Promise<void> {
   menuBox.on("select item", async (_: unknown, i: number) => { await updateContent(i); });
 
   menuBox.on("select", async (_: unknown, i: number) => {
-    if (i === 5) { quit(); return; }
+    if (i === 6) { quit(); return; } // Exit is now index 6
     await handleInBlessed(i);
   });
 
@@ -111,7 +113,8 @@ async function handleInBlessed(index: number): Promise<void> {
   if (index === 1) await handleAnalyze();
   if (index === 2) await handleTest();
   if (index === 3) await handleMcp();
-  if (index === 4) await handleSettings();
+  if (index === 4) await handlePlugins();
+  if (index === 5) await handleSettings();
 }
 
 async function handleRun(): Promise<void> {
@@ -129,11 +132,28 @@ async function handleRun(): Promise<void> {
   });
   if (!wf) return;
 
-  const input = await blessedInput(screen, { message: t("run.input") });
-  if (!input) return;
-
   const lang = (await import("../i18n/index.js")).getLang();
   const isKo = lang === "ko";
+
+  // Input method: file or text
+  const inputMethod = await blessedSelect(screen, {
+    message: t("run.inputMethod"),
+    items: [
+      { value: "file", label: t("run.selectFile") },
+      { value: "text", label: t("run.typeText") },
+    ],
+  });
+  if (!inputMethod) return;
+
+  let input: string | null;
+  if (inputMethod === "file") {
+    input = await blessedFileBrowser(screen, {
+      label: isKo ? "파일 선택" : "Select File",
+    });
+  } else {
+    input = await blessedInput(screen, { message: t("run.input") });
+  }
+  if (!input) return;
 
   const model = await blessedSelect(screen, {
     message: t("run.model"),
@@ -479,12 +499,90 @@ async function handleSettings(): Promise<void> {
   }
 }
 
+async function handlePlugins(): Promise<void> {
+  const action = await blessedSelect(screen, {
+    message: "Plugins",
+    items: [
+      { value: "workflows", label: "Workflows", hint: "installed workflow templates" },
+      { value: "roles", label: "Roles", hint: "installed role definitions" },
+      { value: "import-wf", label: "Import workflow", hint: "from file" },
+      { value: "import-role", label: "Import role", hint: "from file" },
+    ],
+  });
+  if (!action) return;
+
+  if (action === "workflows") {
+    const wfs = await findWorkflows("./workflows")
+      .then((w) => w.length > 0 ? w : findWorkflows("./templates/workflows"));
+
+    if (wfs.length === 0) {
+      await blessedMessage(screen, "No workflows found.", { label: "Workflows", height: 5 });
+    } else {
+      const content = wfs.map((wf, i) => `  ${i + 1}. {cyan-fg}${wf}{/cyan-fg}`).join("\n");
+      await blessedMessage(screen, `{bold}Installed Workflows:{/bold}\n\n${content}`, { label: "Workflows" });
+    }
+    return;
+  }
+
+  if (action === "roles") {
+    let roles: string[] = [];
+    for (const dir of ["./roles", "./templates/roles"]) {
+      try {
+        const files = await readdir(resolve(dir));
+        roles = files.filter((f) => extname(f) === ".yaml").map((f) => basename(f, ".yaml"));
+        if (roles.length > 0) break;
+      } catch { continue; }
+    }
+
+    if (roles.length === 0) {
+      await blessedMessage(screen, "No roles found.", { label: "Roles", height: 5 });
+    } else {
+      const content = roles.map((r, i) => `  ${i + 1}. {cyan-fg}${r}{/cyan-fg}`).join("\n");
+      await blessedMessage(screen, `{bold}Installed Roles:{/bold}\n\n${content}`, { label: "Roles" });
+    }
+    return;
+  }
+
+  if (action === "import-wf") {
+    const file = await blessedFileBrowser(screen, { label: "Select workflow YAML" });
+    if (!file) return;
+
+    try {
+      const { copyFile, mkdir } = await import("node:fs/promises");
+      await mkdir(resolve("./workflows"), { recursive: true });
+      const dest = resolve("./workflows", basename(file));
+      await copyFile(file, dest);
+      await blessedMessage(screen, `{green-fg}Imported: ${basename(file)} -> workflows/{/green-fg}`, { label: "Import", height: 5 });
+    } catch (err) {
+      await blessedMessage(screen, `{red-fg}Error: ${err}{/red-fg}`, { label: "Import", height: 5 });
+    }
+    await updateContent(4);
+    return;
+  }
+
+  if (action === "import-role") {
+    const file = await blessedFileBrowser(screen, { label: "Select role YAML" });
+    if (!file) return;
+
+    try {
+      const { copyFile, mkdir } = await import("node:fs/promises");
+      await mkdir(resolve("./roles"), { recursive: true });
+      const dest = resolve("./roles", basename(file));
+      await copyFile(file, dest);
+      await blessedMessage(screen, `{green-fg}Imported: ${basename(file)} -> roles/{/green-fg}`, { label: "Import", height: 5 });
+    } catch (err) {
+      await blessedMessage(screen, `{red-fg}Error: ${err}{/red-fg}`, { label: "Import", height: 5 });
+    }
+    await updateContent(4);
+  }
+}
+
 // ─── Content Panels ──────────────────────────────────
 
 async function updateContent(index: number): Promise<void> {
   const labels = [
     ` ${t("menu.run")} `, ` ${t("menu.analyze")} `, ` ${t("menu.test")} `,
-    ` ${t("menu.mcp")} `, ` ${t("menu.config")} `,
+    ` ${t("menu.mcp")} `, " Plugins ", ` ${t("menu.config")} `,
   ];
   contentBox.setLabel(labels[index] ?? "");
 
@@ -493,7 +591,8 @@ async function updateContent(index: number): Promise<void> {
     case 1: contentBox.setContent(await renderAnalyzePanel()); break;
     case 2: contentBox.setContent(await renderTestPanel()); break;
     case 3: contentBox.setContent(await renderMcpPanel()); break;
-    case 4: contentBox.setContent(await renderSettingsPanel()); break;
+    case 4: contentBox.setContent(await renderPluginsPanel()); break;
+    case 5: contentBox.setContent(await renderSettingsPanel()); break;
   }
   screen.render();
 }
@@ -582,6 +681,37 @@ async function renderSettingsPanel(): Promise<string> {
     `  {bold}Language:{/bold}  ${lang === "ko" ? "한국어" : "English"}`, "",
     "  {gray-fg}Press Enter to modify.{/gray-fg}",
   ].join("\n");
+}
+
+async function renderPluginsPanel(): Promise<string> {
+  const wfs = await findWorkflows("./workflows")
+    .then((w) => w.length > 0 ? w : findWorkflows("./templates/workflows"));
+
+  let roles: string[] = [];
+  for (const dir of ["./roles", "./templates/roles"]) {
+    try {
+      const files = await readdir(resolve(dir));
+      roles = files.filter((f) => extname(f) === ".yaml").map((f) => basename(f, ".yaml"));
+      if (roles.length > 0) break;
+    } catch { continue; }
+  }
+
+  const lines = [
+    "", "  {bold}{white-fg}Plugins{/white-fg}{/bold}", "",
+    `  {bold}Workflows:{/bold}  ${wfs.length}`,
+  ];
+  for (const wf of wfs) lines.push(`    {cyan-fg}>{/cyan-fg} ${wf}`);
+
+  lines.push("", `  {bold}Roles:{/bold}  ${roles.length}`);
+  for (const r of roles) lines.push(`    {cyan-fg}>{/cyan-fg} ${r}`);
+
+  lines.push(
+    "", "  {bold}Actions:{/bold}",
+    "    Import workflow (from file)",
+    "    Import role (from file)", "",
+    "  {gray-fg}Press Enter to manage.{/gray-fg}",
+  );
+  return lines.join("\n");
 }
 
 // ─── Helpers ─────────────────────────────────────────
