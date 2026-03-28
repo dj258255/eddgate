@@ -19,112 +19,119 @@ const program = new Command();
 
 program
   .name("eddgate")
-  .description("Evaluation-driven multi-agent workflow engine")
-  .version("0.1.0");
+  .description("Evaluation-gated workflow engine. Deterministic validation for LLM agents.")
+  .version("0.2.0");
+
+// ─── Core Commands (what users need to get started) ─────────
 
 program
   .command("init")
-  .description("Initialize eddgate project structure")
+  .description("Create a new eddgate project")
   .option("-d, --dir <path>", "Project directory", ".")
   .action(initCommand);
 
 program
   .command("doctor")
-  .description("Check environment and config health")
+  .description("Check if everything is set up correctly")
   .option("-c, --config <path>", "Config file", "./eddgate.config.yaml")
   .option("-w, --workflows-dir <path>", "Workflows directory", "./workflows")
-  .option("--ci", "CI mode (Claude CLI check becomes warning)")
+  .option("--ci", "CI mode")
   .action(doctorCommand);
 
 program
   .command("run <workflow>")
   .description("Run a workflow")
   .option("-i, --input <file>", "Input file or text")
-  .option("-c, --config <path>", "Project config file", "./eddgate.config.yaml")
+  .option("-c, --config <path>", "Config file", "./eddgate.config.yaml")
   .option("-w, --workflows-dir <path>", "Workflows directory", "./workflows")
-  .option("-r, --roles-dir <path>", "Roles directory", "./roles")
   .option("-p, --prompts-dir <path>", "Prompts directory", "./prompts")
   .option("-o, --output <path>", "Save result to file")
   .option("--report <path>", "Generate HTML report")
   .option("--trace-jsonl <path>", "Save JSONL trace")
-  .option("--tui", "Show interactive TUI dashboard after completion")
-  .option("--max-budget-usd <amount>", "Maximum cost budget in USD", parseFloat)
-  .option("--verbose", "Verbose output")
-  .option("--quiet", "Minimal output (errors only)")
-  .option("--json", "Machine-readable JSON output")
-  .option("--dry-run", "Preview workflow structure without executing")
+  .option("--tui", "Interactive TUI dashboard after completion")
+  .option("--max-budget-usd <n>", "Cost limit in USD", parseFloat)
+  .option("--quiet", "Errors only")
+  .option("--json", "JSON output")
+  .option("--dry-run", "Preview without executing")
   .action(runCommand);
 
 program
+  .command("list <type>")
+  .description("List workflows or roles")
+  .option("-d, --dir <path>", "Directory")
+  .action(listCommand);
+
+// ─── Advanced Commands ──────────────────────────────────────
+
+const advanced = program
+  .command("advanced")
+  .description("Advanced commands (eval, trace, monitor, gate, viz)")
+  .alias("adv");
+
+advanced
   .command("step <workflow> <step-id>")
-  .description("Run a single step (for debugging)")
-  .option("-i, --input <file>", "Input file or text")
-  .option("-w, --workflows-dir <path>", "Workflows directory", "./workflows")
-  .option("-p, --prompts-dir <path>", "Prompts directory", "./prompts")
+  .description("Run a single step")
+  .option("-i, --input <file>", "Input")
+  .option("-w, --workflows-dir <path>", "Workflows dir", "./workflows")
+  .option("-p, --prompts-dir <path>", "Prompts dir", "./prompts")
   .action(stepCommand);
 
-program
-  .command("trace <trace-id-or-file>")
-  .description("View a trace (JSONL file or trace ID)")
-  .option("-f, --format <format>", "Output format: summary | json", "summary")
-  .option("-d, --dir <path>", "Traces directory", "./traces")
+advanced
+  .command("trace <file>")
+  .description("View a trace file")
+  .option("-f, --format <fmt>", "summary | json", "summary")
+  .option("-d, --dir <path>", "Traces dir", "./traces")
   .action(traceCommand);
 
-program
+advanced
   .command("eval <workflow>")
-  .description("Run offline evaluation on saved traces")
-  .option("-d, --dataset <path>", "Traces directory", "./traces")
-  .option("-o, --output <path>", "Save evaluation results")
-  .option("-w, --workflows-dir <path>", "Workflows directory", "./workflows")
-  .option("-m, --model <model>", "Model for evaluation", "sonnet")
+  .description("Offline evaluation on saved traces")
+  .option("-d, --dataset <path>", "Traces dir", "./traces")
+  .option("-o, --output <path>", "Save results")
+  .option("-w, --workflows-dir <path>", "Workflows dir", "./workflows")
+  .option("-m, --model <model>", "Eval model", "sonnet")
   .action(evalCommand);
 
-program
+advanced
   .command("diff-eval <workflow>")
-  .description("Compare evaluation scores between git commits")
-  .option("-b, --before <commit>", "Before commit hash", "HEAD~1")
-  .option("-a, --after <commit>", "After commit hash", "HEAD")
-  .option("-d, --dir <path>", "Traces directory", "./traces")
+  .description("Compare scores between commits")
+  .option("-b, --before <commit>", "Before", "HEAD~1")
+  .option("-a, --after <commit>", "After", "HEAD")
+  .option("-d, --dir <path>", "Traces dir", "./traces")
   .action(diffEvalCommand);
 
-program
+advanced
   .command("gate")
-  .description("Run deployment gate check on evaluation results")
-  .requiredOption("-r, --results <path>", "Evaluation results JSON file")
-  .requiredOption("--rules <path>", "Gate rules YAML file")
+  .description("Deployment gate check")
+  .requiredOption("-r, --results <path>", "Eval results JSON")
+  .requiredOption("--rules <path>", "Gate rules YAML")
   .action(gateCommand);
 
-program
+advanced
   .command("monitor <action>")
-  .description("View aggregated metrics (actions: status, cost, quality)")
-  .option("-d, --dir <path>", "Traces directory", "./traces")
-  .option("-p, --period <period>", "Time period (e.g., 7d, 24h, 30d)", "7d")
+  .description("Metrics: status | cost | quality")
+  .option("-d, --dir <path>", "Traces dir", "./traces")
+  .option("-p, --period <period>", "Period (7d, 24h, 30d)", "7d")
   .action(monitorCommand);
 
-program
+advanced
   .command("version-diff")
-  .description("Show prompt/workflow changes between git commits")
-  .option("-c, --commit <hash>", "Compare against commit", "HEAD~1")
-  .option("--paths <paths>", "Comma-separated paths to track", "templates/prompts,templates/workflows")
+  .description("Prompt/workflow version changes")
+  .option("-c, --commit <hash>", "Compare against", "HEAD~1")
+  .option("--paths <paths>", "Tracked paths", "templates/prompts,templates/workflows")
   .action(versionDiffCommand);
 
-program
+advanced
   .command("mcp <action> [args...]")
-  .description("Manage MCP servers (actions: list, add, remove)")
-  .option("-c, --config <path>", "Config file", "./eddgate.config.yaml")
+  .description("MCP servers: list | add | remove")
+  .option("-c, --config <path>", "Config", "./eddgate.config.yaml")
   .action((action: string, args: string[], opts) => mcpCommand(action, opts, args));
 
-program
+advanced
   .command("viz <workflow>")
-  .description("Visualize workflow as diagram")
-  .option("-w, --workflows-dir <path>", "Workflows directory", "./workflows")
-  .option("-f, --format <format>", "Output format: ascii | mermaid", "mermaid")
+  .description("Workflow diagram (mermaid | ascii)")
+  .option("-w, --workflows-dir <path>", "Workflows dir", "./workflows")
+  .option("-f, --format <fmt>", "mermaid | ascii", "mermaid")
   .action(vizCommand);
-
-program
-  .command("list <type>")
-  .description("List workflows or roles (type: workflows | roles)")
-  .option("-d, --dir <path>", "Search directory")
-  .action(listCommand);
 
 program.parse();

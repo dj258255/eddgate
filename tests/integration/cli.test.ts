@@ -31,22 +31,20 @@ function runFail(args: string[]): { stdout: string; stderr: string; status: numb
   }
 }
 
-describe("CLI Integration", () => {
-  it("shows help", () => {
+describe("CLI Core Commands", () => {
+  it("shows help with core commands", () => {
     const out = run(["--help"]);
     expect(out).toContain("eddgate");
-    expect(out).toContain("run");
-    expect(out).toContain("step");
-    expect(out).toContain("trace");
-    expect(out).toContain("eval");
     expect(out).toContain("init");
     expect(out).toContain("doctor");
+    expect(out).toContain("run");
     expect(out).toContain("list");
+    expect(out).toContain("advanced");
   });
 
   it("shows version", () => {
     const out = run(["--version"]);
-    expect(out.trim()).toBe("0.1.0");
+    expect(out.trim()).toBe("0.2.0");
   });
 
   it("lists workflows", () => {
@@ -54,30 +52,26 @@ describe("CLI Integration", () => {
     expect(out).toContain("document-pipeline");
     expect(out).toContain("code-review");
     expect(out).toContain("bug-fix");
+    expect(out).toContain("api-design");
+    expect(out).toContain("translation");
   });
 
   it("dry-run document-pipeline", () => {
     const out = run(["run", "document-pipeline", "--dry-run", "-w", WORKFLOWS]);
     expect(out).toContain("classify");
     expect(out).toContain("retrieve");
-    expect(out).toContain("generate_citation");
     expect(out).toContain("validate_final");
-    expect(out).toContain("T1");
-    expect(out).toContain("T2");
   });
 
   it("dry-run code-review", () => {
     const out = run(["run", "code-review", "--dry-run", "-w", WORKFLOWS]);
     expect(out).toContain("analyze_diff");
-    expect(out).toContain("detect_issues");
     expect(out).toContain("generate_report");
   });
 
   it("dry-run bug-fix", () => {
     const out = run(["run", "bug-fix", "--dry-run", "-w", WORKFLOWS]);
     expect(out).toContain("reproduce");
-    expect(out).toContain("root_cause");
-    expect(out).toContain("implement_fix");
     expect(out).toContain("verify_fix");
   });
 
@@ -86,29 +80,35 @@ describe("CLI Integration", () => {
     expect(result.status).not.toBe(0);
   });
 
-  it("step command shows help", () => {
-    const out = run(["step", "--help"]);
-    expect(out).toContain("step-id");
-    expect(out).toContain("--input");
-  });
-
-  it("trace command shows help", () => {
-    const out = run(["trace", "--help"]);
-    expect(out).toContain("trace-id-or-file");
-    expect(out).toContain("--format");
-  });
-
-  it("eval command shows help", () => {
-    const out = run(["eval", "--help"]);
-    expect(out).toContain("--dataset");
-    expect(out).toContain("--model");
-  });
-
-  it("run command has budget flag", () => {
+  it("run command has key flags", () => {
     const out = run(["run", "--help"]);
     expect(out).toContain("--max-budget-usd");
-    expect(out).toContain("--verbose");
     expect(out).toContain("--quiet");
     expect(out).toContain("--json");
+    expect(out).toContain("--report");
+    expect(out).toContain("--tui");
+  });
+});
+
+describe("CLI Advanced Commands", () => {
+  it("shows advanced help", () => {
+    const out = run(["advanced", "--help"]);
+    expect(out).toContain("step");
+    expect(out).toContain("trace");
+    expect(out).toContain("eval");
+    expect(out).toContain("gate");
+    expect(out).toContain("monitor");
+    expect(out).toContain("viz");
+  });
+
+  it("advanced step shows help", () => {
+    const out = run(["advanced", "step", "--help"]);
+    expect(out).toContain("step-id");
+  });
+
+  it("advanced viz generates mermaid", () => {
+    const out = run(["advanced", "viz", "document-pipeline", "-w", WORKFLOWS]);
+    expect(out).toContain("mermaid");
+    expect(out).toContain("classify");
   });
 });

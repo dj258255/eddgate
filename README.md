@@ -1,18 +1,10 @@
 # eddgate
 
-Evaluation-gated multi-agent workflow engine.
+Evaluation-gated workflow engine for LLM agents.
 
-Deterministic validation gates, structured traces, reproducible execution.
-Powered by Claude Agent SDK (Max subscription, no API key needed).
+Runs deterministic validation gates between workflow steps. If a step's output fails validation, the pipeline stops. No bad output passes through.
 
-## Core Features
-
-- **Deterministic validation gates** -- Zod schema-based Tier 1 checks (0% false positives, 5ms)
-- **LLM evaluation at key transitions** -- groundedness/relevance scoring at critical points
-- **Reproducible execution** -- same input produces same execution path
-- **Search/generation separation enforced** -- retrieve steps cannot access execution context (code-enforced)
-- **GenAIOps pipeline** -- build/evaluate/deploy/operate lifecycle fully covered
-- **Structured traces** -- JSONL + HTML report + TUI dashboard + Langfuse/OTel adapters
+Works with Claude CLI (any subscription) or Anthropic API.
 
 ## Install
 
@@ -20,188 +12,106 @@ Powered by Claude Agent SDK (Max subscription, no API key needed).
 npm install -g eddgate
 ```
 
-Requirements: Node.js 20+, Claude Code CLI (Max/Pro subscription)
-
-## Quick Start
+## Get Started
 
 ```bash
-eddgate init                                    # scaffold project
-eddgate doctor                                  # check environment
-eddgate run example --input input.txt --dry-run # preview workflow
-eddgate run example --input input.txt           # execute workflow
+eddgate init          # create project structure
+eddgate doctor        # check setup
+eddgate run example --input input.txt --dry-run   # preview
+eddgate run example --input input.txt             # execute
 ```
 
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `init` | Scaffold project structure |
-| `doctor` | Health check (Node, Claude CLI, config, graph validation) |
-| `run` | Execute workflow (--report, --tui, --json, --max-budget-usd) |
-| `step` | Run single step for debugging |
-| `trace` | View saved traces (summary or JSON) |
-| `eval` | Offline evaluation on saved traces |
-| `diff-eval` | Compare evaluation scores between git commits |
-| `gate` | Deployment gate check with configurable rules |
-| `monitor` | Aggregated metrics: status, cost by model/step, quality trends |
-| `version-diff` | Show prompt/workflow changes between commits |
-| `mcp` | Manage MCP servers (list/add/remove) |
-| `viz` | Workflow visualization (Mermaid/ASCII) |
-| `list` | List workflows and roles |
-
-## GenAIOps Pipeline
-
-eddgate covers the full GenAIOps lifecycle:
+## How It Works
 
 ```
-build:    Git + version-diff        (prompt/workflow versioning)
-evaluate: eval + diff-eval          (offline evaluation + regression detection)
-deploy:   gate                      (configurable rules, CI integration)
-operate:  monitor + trace           (cost/quality/status aggregation)
+input
+  |
+  v
+[Step 1: classify] --> [Validation Gate] --> pass? --> [Step 2: retrieve]
+                              |
+                              v
+                        fail? --> STOP
 ```
 
-## 3-Tier Evaluation
+Each step runs through Claude (or any LLM), then hits a validation gate:
 
-| Tier | Method | Cost | Timing | Accuracy |
-|------|--------|------|--------|----------|
-| 1 | Rule-based (Zod) | $0 | Every step, 5ms | 100% deterministic |
-| 2 | LLM-as-judge | ~$0.01/call | Key transitions only | ~85% |
-| 3 | Offline batch | Variable | Async (CI/CD) | Dataset-dependent |
+- **Tier 1 (every step)**: Zod schema checks. Deterministic. 0% false positives. 5ms.
+- **Tier 2 (key transitions)**: LLM-as-judge. Groundedness/relevance scoring.
 
-## Architecture
+If validation fails, the pipeline blocks. No silent failures.
 
-```
-Code controls (deterministic)        Claude executes (Max subscription)
-----------------------------        --------------------------------
-Workflow Engine                      query() via Claude Agent SDK
-  Topological sort                     LLM calls per step
-  Dependency resolution                Web search, file ops
-  Tier 1 Zod validation               Structured output (JSON Schema)
-  Tier 2 LLM evaluation
-  Budget control
-  Graph validation
-  Retry with exponential backoff
-  Trace recording
-```
-
-## Context Engineering
-
-Enforced rules in code, not just prompts:
-
-- **Retrieve steps cannot access execution context** -- search queries contain only the user's original input, preventing context leakage
-- **Minimal context** -- 100-token summaries instead of raw output (prevents context rot)
-- **Fixed execution context structure** -- state/identity/tools as reproducible JSON
-
-## Workflow Definition
-
-YAML files, Git-versioned:
+## Workflow Example
 
 ```yaml
-name: "Document Pipeline"
+name: "My Pipeline"
 config:
   defaultModel: "sonnet"
   topology: "pipeline"
   onValidationFail: "block"
 
 steps:
-  - id: "classify"
+  - id: "analyze"
     type: "classify"
     context:
       identity:
         role: "analyzer"
-        constraints: ["structured JSON output"]
+        constraints: ["output JSON with topics array"]
       tools: []
     validation:
       rules:
         - type: "required_fields"
           spec: { fields: ["topics"] }
-          message: "topics required"
-
-  - id: "retrieve"
-    type: "retrieve"
-    dependsOn: ["classify"]
-    context:
-      identity:
-        role: "researcher"
-        constraints: ["official sources only"]
-      tools: ["web_search"]
+          message: "topics field required"
 
   - id: "generate"
     type: "generate"
-    dependsOn: ["retrieve"]
+    dependsOn: ["analyze"]
     evaluation:
       enabled: true
       type: "groundedness"
       threshold: 0.7
-      onFail: "flag"
+      onFail: "block"
 ```
 
-## Step Types
+## LLM Support
 
-| Type | Description |
-|------|-------------|
-| `classify` | Analyze and categorize input |
-| `retrieve` | Search for evidence (context isolation enforced) |
-| `generate` | Produce output content |
-| `validate` | Check output quality (no modification) |
-| `transform` | Restructure without changing content |
-| `human_approval` | Wait for human approve/deny |
-| `record_decision` | Log execution result for audit trail |
+eddgate auto-detects the best available backend:
 
-## Deployment Gate
+| Backend | Setup | Cost |
+|---------|-------|------|
+| **Claude CLI** (default) | Any Claude subscription + `claude` installed | Included in subscription |
+| **Anthropic API** | Set `ANTHROPIC_API_KEY` | Pay per token |
 
-```yaml
-# gate-rules.yaml
-rules:
-  - metric: "avg_score"
-    condition: ">= 0.75"
-  - metric: "pass_rate"
-    condition: ">= 0.8"
-  - metric: "groundedness_avg"
-    condition: ">= 0.7"
-```
-
-```bash
-eddgate eval my-workflow --output results.json
-eddgate gate --results results.json --rules gate-rules.yaml
-```
-
-## Monitoring
-
-```bash
-eddgate monitor status -p 7d    # success rate, latency, tokens, cost
-eddgate monitor cost -p 30d     # cost breakdown by model and step
-eddgate monitor quality -p 7d   # evaluation score trends
-```
+No lock-in. The adapter pattern lets you plug in any LLM.
 
 ## Built-in Workflows
 
-| Workflow | Steps | Use Case |
-|----------|-------|----------|
-| document-pipeline | 8 | Query analysis, link collection, answer generation, validation |
-| code-review | 3 | Diff analysis, issue detection, review report |
-| bug-fix | 4 | Reproduce, root cause, fix, verify |
-| api-design | 3 | Requirements, endpoint design, documentation |
-| translation | 3 | Source analysis, translation, quality check |
+```bash
+eddgate run document-pipeline --dry-run -w templates/workflows
+eddgate run code-review --dry-run -w templates/workflows
+eddgate run bug-fix --dry-run -w templates/workflows
+eddgate run api-design --dry-run -w templates/workflows
+eddgate run translation --dry-run -w templates/workflows
+```
+
+## Advanced
+
+```bash
+eddgate advanced step <workflow> <step-id>   # debug single step
+eddgate advanced trace <file>                # view trace
+eddgate advanced eval <workflow>             # offline evaluation
+eddgate advanced monitor status              # metrics dashboard
+eddgate advanced gate --results r.json --rules rules.yaml  # deploy gate
+eddgate advanced viz <workflow>              # Mermaid diagram
+```
 
 ## Output Formats
 
-- **stdout** -- real-time execution log
-- **JSONL** -- structured trace (--trace-jsonl)
-- **HTML** -- visual report with dark mode (--report)
-- **TUI** -- interactive terminal dashboard (--tui)
-- **JSON** -- machine-readable output (--json)
-
-## Trace Adapters
-
-- **Langfuse** -- auto-enabled via LANGFUSE_PUBLIC_KEY/LANGFUSE_SECRET_KEY
-- **OpenTelemetry** -- compatible with Jaeger, Grafana Tempo, Datadog
-
-## Research
-
-- [RESEARCH_ANALYSIS.md](RESEARCH_ANALYSIS.md) -- 40+ papers, 16 frameworks analysis
-- [CRITICAL_ANALYSIS.md](CRITICAL_ANALYSIS.md) -- pessimistic validation of each feature
-- [ARCHITECTURE.md](ARCHITECTURE.md) -- architecture spec and design rationale
+- stdout (real-time log)
+- `--report report.html` (visual report, dark mode)
+- `--trace-jsonl trace.jsonl` (structured trace)
+- `--tui` (interactive terminal dashboard)
+- `--json` (machine-readable)
 
 ## License
 
