@@ -14,127 +14,156 @@ import { vizCommand } from "./commands/viz.js";
 import { monitorCommand } from "./commands/monitor.js";
 import { gateCommand } from "./commands/gate.js";
 import { versionDiffCommand } from "./commands/version-diff.js";
+import { tuilauncher } from "./tui-launcher.js";
+import { setEffort } from "../core/agent-runner.js";
 
-const program = new Command();
+// No args = TUI mode
+if (process.argv.length <= 2) {
+  launchTUI();
+} else {
+  launchCLI();
+}
 
-program
-  .name("eddgate")
-  .description("Evaluation-gated workflow engine. Deterministic validation for LLM agents.")
-  .version("0.1.0");
+async function launchTUI(): Promise<void> {
+  const result = await tuilauncher();
 
-// ─── Core Commands (what users need to get started) ─────────
+  if (result.cancelled) {
+    process.exit(0);
+  }
 
-program
-  .command("init")
-  .description("Create a new eddgate project")
-  .option("-d, --dir <path>", "Project directory", ".")
-  .action(initCommand);
+  if (result.effort && result.effort !== "medium") {
+    setEffort(result.effort);
+  }
 
-program
-  .command("doctor")
-  .description("Check if everything is set up correctly")
-  .option("-c, --config <path>", "Config file", "./eddgate.config.yaml")
-  .option("-w, --workflows-dir <path>", "Workflows directory", "./workflows")
-  .option("--ci", "CI mode")
-  .action(doctorCommand);
+  // Build args for run command
+  await runCommand(result.workflow, {
+    input: result.input,
+    model: result.model,
+    config: "./eddgate.config.yaml",
+    workflowsDir: result.workflowsDir,
+    rolesDir: "./roles",
+    promptsDir: result.promptsDir,
+    report: result.report,
+    traceJsonl: result.traceJsonl,
+    maxBudgetUsd: result.maxBudgetUsd,
+    tui: true, // Show TUI dashboard after completion
+    interactive: false,
+    quiet: false,
+    json: false,
+    dryRun: false,
+  });
+}
 
-program
-  .command("run <workflow>")
-  .description("Run a workflow")
-  .option("-i, --input <file>", "Input file or text")
-  .option("-m, --model <model>", "Override model (sonnet, opus, haiku)")
-  .option("-e, --effort <level>", "Effort level (low, medium, high, max)")
-  .option("-c, --config <path>", "Config file", "./eddgate.config.yaml")
-  .option("-w, --workflows-dir <path>", "Workflows directory", "./workflows")
-  .option("-p, --prompts-dir <path>", "Prompts directory", "./prompts")
-  .option("-o, --output <path>", "Save result to file")
-  .option("--report <path>", "Generate HTML report")
-  .option("--trace-jsonl <path>", "Save JSONL trace")
-  .option("--tui", "Interactive TUI dashboard after completion")
-  .option("--max-budget-usd <n>", "Cost limit in USD", parseFloat)
-  .option("--interactive", "Interactive setup before running")
-  .option("--quiet", "Errors only")
-  .option("--json", "JSON output")
-  .option("--dry-run", "Preview without executing")
-  .action(runCommand);
+function launchCLI(): void {
+  const program = new Command();
 
-program
-  .command("list <type>")
-  .description("List workflows or roles")
-  .option("-d, --dir <path>", "Directory")
-  .action(listCommand);
+  program
+    .name("eddgate")
+    .description("Evaluation-gated workflow engine. Run without arguments for TUI mode.")
+    .version("0.1.0");
 
-// ─── Advanced Commands ──────────────────────────────────────
+  program
+    .command("init")
+    .description("Create a new eddgate project")
+    .option("-d, --dir <path>", "Project directory", ".")
+    .action(initCommand);
 
-const advanced = program
-  .command("advanced")
-  .description("Advanced commands (eval, trace, monitor, gate, viz)")
-  .alias("adv");
+  program
+    .command("doctor")
+    .description("Check if everything is set up correctly")
+    .option("-c, --config <path>", "Config file", "./eddgate.config.yaml")
+    .option("-w, --workflows-dir <path>", "Workflows directory", "./workflows")
+    .option("--ci", "CI mode")
+    .action(doctorCommand);
 
-advanced
-  .command("step <workflow> <step-id>")
-  .description("Run a single step")
-  .option("-i, --input <file>", "Input")
-  .option("-w, --workflows-dir <path>", "Workflows dir", "./workflows")
-  .option("-p, --prompts-dir <path>", "Prompts dir", "./prompts")
-  .action(stepCommand);
+  program
+    .command("run <workflow>")
+    .description("Run a workflow")
+    .option("-i, --input <file>", "Input file or text")
+    .option("-m, --model <model>", "Override model (sonnet, opus, haiku)")
+    .option("-e, --effort <level>", "Effort level (low, medium, high, max)")
+    .option("-c, --config <path>", "Config file", "./eddgate.config.yaml")
+    .option("-w, --workflows-dir <path>", "Workflows directory", "./workflows")
+    .option("-p, --prompts-dir <path>", "Prompts directory", "./prompts")
+    .option("-o, --output <path>", "Save result to file")
+    .option("--report <path>", "Generate HTML report")
+    .option("--trace-jsonl <path>", "Save JSONL trace")
+    .option("--tui", "Interactive TUI dashboard after completion")
+    .option("--max-budget-usd <n>", "Cost limit in USD", parseFloat)
+    .option("--interactive", "Interactive setup before running")
+    .option("--quiet", "Errors only")
+    .option("--json", "JSON output")
+    .option("--dry-run", "Preview without executing")
+    .action(runCommand);
 
-advanced
-  .command("trace <file>")
-  .description("View a trace file")
-  .option("-f, --format <fmt>", "summary | json", "summary")
-  .option("-d, --dir <path>", "Traces dir", "./traces")
-  .action(traceCommand);
+  program
+    .command("list <type>")
+    .description("List workflows or roles")
+    .option("-d, --dir <path>", "Directory")
+    .action(listCommand);
 
-advanced
-  .command("eval <workflow>")
-  .description("Offline evaluation on saved traces")
-  .option("-d, --dataset <path>", "Traces dir", "./traces")
-  .option("-o, --output <path>", "Save results")
-  .option("-w, --workflows-dir <path>", "Workflows dir", "./workflows")
-  .option("-m, --model <model>", "Eval model", "sonnet")
-  .action(evalCommand);
+  // Advanced
+  const advanced = program
+    .command("advanced")
+    .description("Advanced commands")
+    .alias("adv");
 
-advanced
-  .command("diff-eval <workflow>")
-  .description("Compare scores between commits")
-  .option("-b, --before <commit>", "Before", "HEAD~1")
-  .option("-a, --after <commit>", "After", "HEAD")
-  .option("-d, --dir <path>", "Traces dir", "./traces")
-  .action(diffEvalCommand);
+  advanced.command("step <workflow> <step-id>")
+    .description("Run a single step")
+    .option("-i, --input <file>", "Input")
+    .option("-w, --workflows-dir <path>", "Workflows dir", "./workflows")
+    .option("-p, --prompts-dir <path>", "Prompts dir", "./prompts")
+    .action(stepCommand);
 
-advanced
-  .command("gate")
-  .description("Deployment gate check")
-  .requiredOption("-r, --results <path>", "Eval results JSON")
-  .requiredOption("--rules <path>", "Gate rules YAML")
-  .action(gateCommand);
+  advanced.command("trace <file>")
+    .description("View a trace file")
+    .option("-f, --format <fmt>", "summary | json", "summary")
+    .option("-d, --dir <path>", "Traces dir", "./traces")
+    .action(traceCommand);
 
-advanced
-  .command("monitor <action>")
-  .description("Metrics: status | cost | quality")
-  .option("-d, --dir <path>", "Traces dir", "./traces")
-  .option("-p, --period <period>", "Period (7d, 24h, 30d)", "7d")
-  .action(monitorCommand);
+  advanced.command("eval <workflow>")
+    .description("Offline evaluation on saved traces")
+    .option("-d, --dataset <path>", "Traces dir", "./traces")
+    .option("-o, --output <path>", "Save results")
+    .option("-w, --workflows-dir <path>", "Workflows dir", "./workflows")
+    .option("-m, --model <model>", "Eval model", "sonnet")
+    .action(evalCommand);
 
-advanced
-  .command("version-diff")
-  .description("Prompt/workflow version changes")
-  .option("-c, --commit <hash>", "Compare against", "HEAD~1")
-  .option("--paths <paths>", "Tracked paths", "templates/prompts,templates/workflows")
-  .action(versionDiffCommand);
+  advanced.command("diff-eval <workflow>")
+    .description("Compare scores between commits")
+    .option("-b, --before <commit>", "Before", "HEAD~1")
+    .option("-a, --after <commit>", "After", "HEAD")
+    .option("-d, --dir <path>", "Traces dir", "./traces")
+    .action(diffEvalCommand);
 
-advanced
-  .command("mcp <action> [args...]")
-  .description("MCP servers: list | add | remove")
-  .option("-c, --config <path>", "Config", "./eddgate.config.yaml")
-  .action((action: string, args: string[], opts) => mcpCommand(action, opts, args));
+  advanced.command("gate")
+    .description("Deployment gate check")
+    .requiredOption("-r, --results <path>", "Eval results JSON")
+    .requiredOption("--rules <path>", "Gate rules YAML")
+    .action(gateCommand);
 
-advanced
-  .command("viz <workflow>")
-  .description("Workflow diagram (mermaid | ascii)")
-  .option("-w, --workflows-dir <path>", "Workflows dir", "./workflows")
-  .option("-f, --format <fmt>", "mermaid | ascii", "mermaid")
-  .action(vizCommand);
+  advanced.command("monitor <action>")
+    .description("Metrics: status | cost | quality")
+    .option("-d, --dir <path>", "Traces dir", "./traces")
+    .option("-p, --period <period>", "Period (7d, 24h, 30d)", "7d")
+    .action(monitorCommand);
 
-program.parse();
+  advanced.command("version-diff")
+    .description("Prompt/workflow version changes")
+    .option("-c, --commit <hash>", "Compare against", "HEAD~1")
+    .option("--paths <paths>", "Tracked paths", "templates/prompts,templates/workflows")
+    .action(versionDiffCommand);
+
+  advanced.command("mcp <action> [args...]")
+    .description("MCP servers: list | add | remove")
+    .option("-c, --config <path>", "Config", "./eddgate.config.yaml")
+    .action((action: string, args: string[], opts) => mcpCommand(action, opts, args));
+
+  advanced.command("viz <workflow>")
+    .description("Workflow diagram (mermaid | ascii)")
+    .option("-w, --workflows-dir <path>", "Workflows dir", "./workflows")
+    .option("-f, --format <fmt>", "mermaid | ascii", "mermaid")
+    .action(vizCommand);
+
+  program.parse();
+}
