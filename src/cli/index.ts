@@ -14,6 +14,8 @@ import { vizCommand } from "./commands/viz.js";
 import { monitorCommand } from "./commands/monitor.js";
 import { gateCommand } from "./commands/gate.js";
 import { versionDiffCommand } from "./commands/version-diff.js";
+import { analyzeCommand } from "./commands/analyze.js";
+import { testCommand } from "./commands/test.js";
 import { tuilauncher } from "./tui-launcher.js";
 import { setEffort } from "../core/agent-runner.js";
 
@@ -95,6 +97,22 @@ function launchCLI(): void {
     .option("--json", "JSON output")
     .option("--dry-run", "Preview without executing")
     .action(runCommand);
+
+  program
+    .command("analyze")
+    .description("Analyze failure patterns and generate rules from traces")
+    .option("-d, --dir <path>", "Traces directory", "./traces")
+    .option("--context", "Context window profiler mode")
+    .option("--generate-rules", "Auto-generate validation rules from patterns")
+    .option("-o, --output <path>", "Rules output directory", "./eval/rules")
+    .action(analyzeCommand);
+
+  program
+    .command("test <action>")
+    .description("Regression testing: snapshot | diff | list")
+    .option("-d, --dir <path>", "Traces directory", "./traces")
+    .option("-s, --snapshot-dir <path>", "Snapshots directory", "./.eddgate/snapshots")
+    .action(testCommand);
 
   program
     .command("list <type>")

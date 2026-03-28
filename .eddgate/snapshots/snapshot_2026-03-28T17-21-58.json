@@ -1,0 +1,182 @@
+[
+  {
+    "timestamp": "2026-03-28T17:21:58.101Z",
+    "traceId": "c273ca6f-5ebb-4045-95ef-6a8889055957",
+    "steps": [
+      {
+        "stepId": "classify",
+        "status": "completed",
+        "tokens": 1128,
+        "durationMs": 6746,
+        "validationPassed": true,
+        "outputHash": "0",
+        "outputPreview": ""
+      },
+      {
+        "stepId": "retrieve",
+        "status": "completed",
+        "tokens": 11004,
+        "durationMs": 180406,
+        "validationPassed": true,
+        "outputHash": "0",
+        "outputPreview": ""
+      },
+      {
+        "stepId": "generate_taxonomy",
+        "status": "completed",
+        "tokens": 3256,
+        "durationMs": 51295,
+        "validationPassed": true,
+        "outputHash": "0",
+        "outputPreview": ""
+      },
+      {
+        "stepId": "generate_flow",
+        "status": "completed",
+        "tokens": 2335,
+        "durationMs": 34497,
+        "validationPassed": true,
+        "outputHash": "0",
+        "outputPreview": ""
+      },
+      {
+        "stepId": "generate_citation",
+        "status": "completed",
+        "tokens": 6862,
+        "durationMs": 91176,
+        "validationPassed": true,
+        "evalScore": 0.82,
+        "outputHash": "0",
+        "outputPreview": ""
+      },
+      {
+        "stepId": "structure",
+        "status": "completed",
+        "tokens": 5181,
+        "durationMs": 48291,
+        "validationPassed": true,
+        "outputHash": "0",
+        "outputPreview": ""
+      },
+      {
+        "stepId": "patch",
+        "status": "completed",
+        "tokens": 8542,
+        "durationMs": 132747,
+        "validationPassed": true,
+        "outputHash": "0",
+        "outputPreview": ""
+      },
+      {
+        "stepId": "validate_final",
+        "status": "completed",
+        "tokens": 6521,
+        "durationMs": 82099,
+        "validationPassed": true,
+        "evalScore": 4.4,
+        "outputHash": "0",
+        "outputPreview": ""
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-28T17:21:58.102Z",
+    "traceId": "e817a795-1892-4c5b-8579-d4cc39e0b874",
+    "steps": [
+      {
+        "stepId": "classify",
+        "status": "completed",
+        "tokens": 1114,
+        "durationMs": 8077,
+        "validationPassed": true,
+        "outputHash": "0",
+        "outputPreview": ""
+      },
+      {
+        "stepId": "retrieve",
+        "status": "completed",
+        "tokens": 4590,
+        "durationMs": 57267,
+        "validationPassed": true,
+        "outputHash": "0",
+        "outputPreview": ""
+      },
+      {
+        "stepId": "generate_taxonomy",
+        "status": "completed",
+        "tokens": 3831,
+        "durationMs": 57961,
+        "validationPassed": true,
+        "outputHash": "0",
+        "outputPreview": ""
+      },
+      {
+        "stepId": "generate_flow",
+        "status": "completed",
+        "tokens": 3408,
+        "durationMs": 52442,
+        "validationPassed": true,
+        "outputHash": "0",
+        "outputPreview": ""
+      },
+      {
+        "stepId": "generate_citation",
+        "status": "completed",
+        "tokens": 8141,
+        "durationMs": 122658,
+        "validationPassed": true,
+        "evalScore": 0.78,
+        "outputHash": "0",
+        "outputPreview": ""
+      },
+      {
+        "stepId": "structure",
+        "status": "completed",
+        "tokens": 5620,
+        "durationMs": 47446,
+        "validationPassed": true,
+        "outputHash": "0",
+        "outputPreview": ""
+      },
+      {
+        "stepId": "patch",
+        "status": "completed",
+        "tokens": 2147,
+        "durationMs": 15775,
+        "validationPassed": true,
+        "outputHash": "0",
+        "outputPreview": ""
+      },
+      {
+        "stepId": "validate_final",
+        "status": "completed",
+        "tokens": 430441,
+        "durationMs": 3217,
+        "validationPassed": true,
+        "evalScore": 0.72,
+        "outputHash": "0",
+        "outputPreview": ""
+      },
+      {
+        "stepId": "validate_final",
+        "status": "completed",
+        "tokens": 430441,
+        "durationMs": 3467,
+        "validationPassed": true,
+        "evalScore": 0.72,
+        "outputHash": "0",
+        "outputPreview": ""
+      },
+      {
+        "stepId": "validate_final",
+        "status": "completed",
+        "tokens": 430441,
+        "durationMs": 36870,
+        "validationPassed": true,
+        "evalScore": 0.72,
+        "outputHash": "0",
+        "outputPreview": ""
+      }
+    ]
+  }
+]
