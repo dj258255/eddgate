@@ -32,65 +32,72 @@ async function launchTUI(): Promise<void> {
 
   p.intro(chalk.yellow("<|>") + " " + chalk.bold("eddgate"));
 
-  const mode = await p.select({
-    message: "What do you want to do?",
-    options: [
-      { value: "run", label: "Run a workflow", hint: "execute with eval gates" },
-      { value: "analyze", label: "Analyze failures", hint: "find patterns, generate rules" },
-      { value: "test", label: "Regression test", hint: "snapshot/diff behavior" },
-      { value: "mcp", label: "MCP servers", hint: "add, remove, list" },
-      { value: "config", label: "Settings", hint: "model, traces, budget" },
-    ],
-  });
-
-  if (p.isCancel(mode)) { p.cancel("Cancelled."); process.exit(0); }
-
-  if (mode === "analyze") {
-    const contextMode = await p.confirm({ message: "Context window profiler mode?" });
-    if (p.isCancel(contextMode)) { p.cancel("Cancelled."); process.exit(0); }
-
-    const genRules = await p.confirm({ message: "Auto-generate validation rules?" });
-    if (p.isCancel(genRules)) { p.cancel("Cancelled."); process.exit(0); }
-
-    await analyzeCommand({
-      dir: "./traces",
-      context: !!contextMode,
-      generateRules: !!genRules,
-      output: "./eval/rules",
-    });
-    process.exit(0);
-  }
-
-  if (mode === "test") {
-    const action = await p.select({
-      message: "Test action",
+  // Main loop -- Esc/cancel returns to menu, "exit" quits
+  while (true) {
+    const mode = await p.select({
+      message: "What do you want to do?",
       options: [
-        { value: "snapshot", label: "Save snapshot", hint: "capture current behavior as baseline" },
-        { value: "diff", label: "Run diff", hint: "compare against baseline" },
-        { value: "list", label: "List snapshots" },
+        { value: "run", label: "Run a workflow", hint: "execute with eval gates" },
+        { value: "analyze", label: "Analyze failures", hint: "find patterns, generate rules" },
+        { value: "test", label: "Regression test", hint: "snapshot/diff behavior" },
+        { value: "mcp", label: "MCP servers", hint: "add, remove, list" },
+        { value: "config", label: "Settings", hint: "model, traces, budget" },
+        { value: "exit", label: "Exit" },
       ],
     });
-    if (p.isCancel(action)) { p.cancel("Cancelled."); process.exit(0); }
 
-    await testCommand(action as string, { dir: "./traces" });
-    process.exit(0);
-  }
+    if (p.isCancel(mode) || mode === "exit") {
+      p.outro(chalk.dim("bye"));
+      process.exit(0);
+    }
 
-  if (mode === "mcp") {
-    await tuiMcpManager(p);
-    process.exit(0);
-  }
+    if (mode === "analyze") {
+      const contextMode = await p.confirm({ message: "Context window profiler mode?" });
+      if (p.isCancel(contextMode)) continue; // back to menu
 
-  if (mode === "config") {
-    await tuiConfigManager(p);
-    process.exit(0);
-  }
+      const genRules = await p.confirm({ message: "Auto-generate validation rules?" });
+      if (p.isCancel(genRules)) continue;
+
+      await analyzeCommand({
+        dir: "./traces",
+        context: !!contextMode,
+        generateRules: !!genRules,
+        output: "./eval/rules",
+      });
+      continue; // back to menu after done
+    }
+
+    if (mode === "test") {
+      const action = await p.select({
+        message: "Test action",
+        options: [
+          { value: "snapshot", label: "Save snapshot", hint: "capture current behavior as baseline" },
+          { value: "diff", label: "Run diff", hint: "compare against baseline" },
+          { value: "list", label: "List snapshots" },
+          { value: "back", label: "Back" },
+        ],
+      });
+      if (p.isCancel(action) || action === "back") continue;
+
+      await testCommand(action as string, { dir: "./traces" });
+      continue;
+    }
+
+    if (mode === "mcp") {
+      await tuiMcpManager(p);
+      continue;
+    }
+
+    if (mode === "config") {
+      await tuiConfigManager(p);
+      continue;
+    }
 
   // mode === "run" -> launch workflow selector
   const result = await tuilauncher();
 
   if (result.cancelled) {
-    process.exit(0);
+    continue; // back to main menu
   }
 
   if (result.effort && result.effort !== "medium") {
@@ -118,6 +125,7 @@ async function launchTUI(): Promise<void> {
     json: false,
     dryRun: false,
   });
+  } // end while
 }
 
 // ─── TUI: MCP Server Manager ────────────────────────────────
@@ -144,9 +152,10 @@ async function tuiMcpManager(p: typeof import("@clack/prompts")): Promise<void> 
       { value: "list", label: `List servers (${mcp.servers.length})` },
       { value: "add", label: "Add new server" },
       { value: "remove", label: "Remove server" },
+      { value: "back", label: "Back" },
     ],
   });
-  if (p.isCancel(action)) return;
+  if (p.isCancel(action) || action === "back") return;
 
   if (action === "list") {
     if (mcp.servers.length === 0) {
@@ -237,15 +246,19 @@ async function tuiConfigManager(p: typeof import("@clack/prompts")): Promise<voi
 
   const model = (config.model as Record<string, unknown>) ?? { default: "sonnet" };
 
+  const currentLang = (config.language as string) ?? "en";
+
   const setting = await p.select({
     message: "Settings",
     options: [
       { value: "model", label: `Default model: ${model.default ?? "sonnet"}` },
+      { value: "language", label: `Language: ${currentLang === "ko" ? "한국어" : "English"}` },
       { value: "traces", label: "Trace output settings" },
       { value: "view", label: "View current config" },
+      { value: "back", label: "Back" },
     ],
   });
-  if (p.isCancel(setting)) return;
+  if (p.isCancel(setting) || setting === "back") return;
 
   if (setting === "model") {
     const { MODELS: modelList } = await import("./models.js");
@@ -260,6 +273,23 @@ async function tuiConfigManager(p: typeof import("@clack/prompts")): Promise<voi
     config.model = model;
     await writeFile(configPath, stringifyYaml(config), "utf-8");
     p.log.success(`Default model set to: ${newModel as string}`);
+    return;
+  }
+
+  if (setting === "language") {
+    const newLang = await p.select({
+      message: "Language",
+      options: [
+        { value: "ko", label: "한국어" },
+        { value: "en", label: "English" },
+      ],
+      initialValue: currentLang,
+    });
+    if (p.isCancel(newLang)) return;
+
+    config.language = newLang as string;
+    await writeFile(configPath, stringifyYaml(config), "utf-8");
+    p.log.success(newLang === "ko" ? "언어가 한국어로 설정되었습니다." : "Language set to English.");
     return;
   }
 
