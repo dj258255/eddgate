@@ -51,6 +51,7 @@ program
   .option("--trace-jsonl <path>", "Save JSONL trace")
   .option("--tui", "Interactive TUI dashboard after completion")
   .option("--max-budget-usd <n>", "Cost limit in USD", parseFloat)
+  .option("--interactive", "Interactive setup before running")
   .option("--quiet", "Errors only")
   .option("--json", "JSON output")
   .option("--dry-run", "Preview without executing")

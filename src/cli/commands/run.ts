@@ -6,6 +6,7 @@ import {
   loadProjectConfig,
   loadPrompt,
 } from "../../config/loader.js";
+import { interactiveSetup } from "../interactive-setup.js";
 import { executeWorkflow } from "../../core/workflow-engine.js";
 import {
   TraceEmitter,
@@ -28,6 +29,7 @@ interface RunOptions {
   tui?: boolean;
   traceJsonl?: string;
   maxBudgetUsd?: number;
+  interactive?: boolean;
   verbose?: boolean;
   quiet?: boolean;
   json?: boolean;
@@ -47,8 +49,24 @@ export async function runCommand(
     console.log(chalk.dim(`워크플로우 로드: ${workflowPath}`));
     const workflow = await loadWorkflow(workflowPath);
 
-    // CLI --model 오버라이드
-    if (options.model) {
+    // Interactive setup
+    if (options.interactive && !options.dryRun) {
+      const setup = await interactiveSetup(
+        workflow.name,
+        workflow.steps.length,
+      );
+      if (!setup.confirmed) {
+        console.log(chalk.dim("\nCancelled."));
+        return;
+      }
+      workflow.config.defaultModel = setup.model;
+      if (setup.maxBudgetUsd) options.maxBudgetUsd = setup.maxBudgetUsd;
+      if (setup.outputReport) options.report = setup.outputReport;
+      if (setup.traceJsonl) options.traceJsonl = setup.traceJsonl;
+    }
+
+    // CLI --model 오버라이드 (interactive보다 우선)
+    if (options.model && !options.interactive) {
       workflow.config.defaultModel = options.model;
     }
 
