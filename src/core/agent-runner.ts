@@ -38,6 +38,7 @@ function isSuccess(msg: SDKResultMessage): msg is SDKResultSuccess {
 
 export async function runAgent(
   options: RunAgentOptions,
+  maxRetries = 3,
 ): Promise<AgentOutput> {
   const { stepId, context, input, rolePrompt, tracer } = options;
 
@@ -50,6 +51,47 @@ export async function runAgent(
 
   const allowedTools = mapTools(context.tools);
 
+  // Retry with exponential backoff on transient errors
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await executeQuery(
+        stepId, model, systemPrompt, fullInput, allowedTools, context, tracer,
+      );
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      const isTransient =
+        lastError.message.includes("rate_limit") ||
+        lastError.message.includes("overloaded") ||
+        lastError.message.includes("ECONNREFUSED") ||
+        lastError.message.includes("ETIMEDOUT") ||
+        lastError.message.includes("network");
+
+      if (!isTransient || attempt === maxRetries - 1) throw lastError;
+
+      const delay = Math.min(1000 * 2 ** attempt, 30000);
+      tracer.emit(stepId, "error", {
+        error: `Transient error, retry ${attempt + 1}/${maxRetries} in ${delay}ms: ${lastError.message}`,
+      });
+      await sleep(delay);
+    }
+  }
+  throw lastError ?? new Error("Unknown error");
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function executeQuery(
+  stepId: string,
+  model: string,
+  systemPrompt: string,
+  fullInput: string,
+  allowedTools: string[],
+  context: ExecutionContext,
+  tracer: TraceEmitter,
+): Promise<AgentOutput> {
   const start = performance.now();
 
   let resultText = "";

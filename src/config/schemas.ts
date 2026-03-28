@@ -136,7 +136,7 @@ const traceOutputConfigSchema = z.object({
   config: z.record(z.string(), z.unknown()).optional(),
 });
 
-// ─── Project Config (eddops.config.yaml) ─────────────────────
+// ─── Project Config (eddgate.config.yaml) ─────────────────────
 
 export const projectConfigSchema = z.object({
   model: modelConfigSchema,

@@ -1,8 +1,8 @@
-# EDDOps CLI
+# eddgate CLI
 
 평가가 내장된 멀티에이전트 워크플로우 엔진.
 
-[EDDOps (Evaluation-Driven Development and Operations)](https://arxiv.org/abs/2411.13768) 원칙을 실용적으로 구현 — 코드가 워크플로우를 제어하고, 결정적 검증으로 품질을 보장합니다.
+[eddgate (Evaluation-Driven Development and Operations)](https://arxiv.org/abs/2411.13768) 원칙을 실용적으로 구현 — 코드가 워크플로우를 제어하고, 결정적 검증으로 품질을 보장합니다.
 
 ## 핵심 특징
 
@@ -16,7 +16,7 @@
 ## 설치
 
 ```bash
-npm install -g eddops
+npm install -g eddgate
 ```
 
 **요구사항**: Node.js 20+, Claude Code CLI 설치 (Max/Pro 구독)
@@ -25,13 +25,13 @@ npm install -g eddops
 
 ```bash
 # 워크플로우 목록 확인
-eddops list workflows -d templates/workflows
+eddgate list workflows -d templates/workflows
 
 # 워크플로우 구조 미리보기
-eddops run document-pipeline --dry-run -w templates/workflows
+eddgate run document-pipeline --dry-run -w templates/workflows
 
 # 실행
-eddops run document-pipeline \
+eddgate run document-pipeline \
   --input query.txt \
   --output result.md \
   --report report.html \
@@ -39,7 +39,7 @@ eddops run document-pipeline \
   -p templates/prompts
 
 # TUI 대시보드로 결과 확인
-eddops run document-pipeline \
+eddgate run document-pipeline \
   --input query.txt \
   --tui \
   -w templates/workflows \

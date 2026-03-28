@@ -26,6 +26,10 @@ interface RunOptions {
   report?: string;
   tui?: boolean;
   traceJsonl?: string;
+  maxBudgetUsd?: number;
+  verbose?: boolean;
+  quiet?: boolean;
+  json?: boolean;
   dryRun?: boolean;
 }
 
@@ -94,7 +98,9 @@ export async function runCommand(
 
     // 트레이서 설정
     const tracer = new TraceEmitter();
-    tracer.onEvent(createStdoutListener());
+    if (!options.quiet && !options.json) {
+      tracer.onEvent(createStdoutListener());
+    }
 
     if (options.traceJsonl) {
       const tracePath = resolve(options.traceJsonl);
@@ -106,22 +112,32 @@ export async function runCommand(
     }
 
     // 실행
-    console.log(
-      chalk.bold(`\n▶ ${workflow.name}`),
-      chalk.dim(`(${workflow.steps.length} steps, ${workflow.config.topology})`),
-    );
-    console.log(chalk.dim(`  모델: ${workflow.config.defaultModel}`));
-    console.log(chalk.dim(`  실패 정책: ${workflow.config.onValidationFail}\n`));
+    if (!options.quiet && !options.json) {
+      console.log(
+        chalk.bold(`\n${workflow.name}`),
+        chalk.dim(`(${workflow.steps.length} steps, ${workflow.config.topology})`),
+      );
+      console.log(chalk.dim(`  model: ${workflow.config.defaultModel}`));
+      if (options.maxBudgetUsd) {
+        console.log(chalk.dim(`  budget: $${options.maxBudgetUsd}`));
+      }
+      console.log();
+    }
 
     const result = await executeWorkflow({
       workflow,
       input,
       rolePrompts,
       tracer,
+      maxBudgetUsd: options.maxBudgetUsd,
     });
 
     // 결과 출력
-    printResult(result);
+    if (options.json) {
+      console.log(JSON.stringify(result, null, 2));
+    } else if (!options.quiet) {
+      printResult(result);
+    }
 
     // 결과 저장
     if (options.output) {

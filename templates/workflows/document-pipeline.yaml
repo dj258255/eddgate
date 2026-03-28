@@ -1,4 +1,4 @@
-name: "EDDOps 문서 파이프라인"
+name: "eddgate 문서 파이프라인"
 description: "6단계 문서 처리 — 문제 구체화 → 링크 수집 → 답변 생성 → 구조 설계 → 패치 실행 → 최종 검증"
 
 config:

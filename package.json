@@ -1,10 +1,10 @@
 {
-  "name": "eddops",
+  "name": "eddgate",
   "version": "0.1.0",
   "description": "EDDOps-native multi-agent CLI — evaluation-driven agent workflows",
   "type": "module",
   "bin": {
-    "eddops": "./dist/cli/index.js"
+    "eddgate": "./dist/cli/index.js"
   },
   "files": [
     "dist/",
@@ -14,7 +14,7 @@
     "ARCHITECTURE.md"
   ],
   "keywords": [
-    "eddops",
+    "eddgate",
     "multi-agent",
     "workflow",
     "evaluation",

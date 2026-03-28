@@ -28,15 +28,17 @@ interface WorkflowEngineOptions {
   input: string;
   rolePrompts?: Map<string, string>;
   tracer?: TraceEmitter;
+  maxBudgetUsd?: number;
 }
 
 export async function executeWorkflow(
   options: WorkflowEngineOptions,
 ): Promise<WorkflowResult> {
-  const { workflow, input, rolePrompts } = options;
+  const { workflow, input, rolePrompts, maxBudgetUsd } = options;
   const tracer = options.tracer ?? new TraceEmitter();
   const results = new Map<string, StepResult>();
   const stepResults: StepResult[] = [];
+  let accumulatedCost = 0;
 
   const workflowStart = performance.now();
   tracer.workflowStart(workflow.name);
@@ -108,6 +110,17 @@ export async function executeWorkflow(
 
       results.set(step.id, stepResult);
       stepResults.push(stepResult);
+
+      // Budget check
+      accumulatedCost += estimateCostFromTokens(
+        stepResult.tokenUsage.input,
+        stepResult.tokenUsage.output,
+      );
+      if (maxBudgetUsd && accumulatedCost > maxBudgetUsd) {
+        tracer.error(step.id, `Budget exceeded: $${accumulatedCost.toFixed(4)} > $${maxBudgetUsd}`);
+        tracer.workflowEnd("failed", Math.round(performance.now() - workflowStart));
+        return buildWorkflowResult(workflow.name, tracer.getTraceId(), "failed", stepResults, workflowStart);
+      }
 
       if (stepResult.status === "failed") {
         if (workflow.config.onValidationFail === "block") {
@@ -471,11 +484,11 @@ function buildWorkflowResult(
     steps,
     totalDurationMs: Math.round(performance.now() - startTime),
     totalTokens: { input: totalInput, output: totalOutput },
-    totalCostEstimate: estimateCost(totalInput, totalOutput),
+    totalCostEstimate: estimateCostFromTokens(totalInput, totalOutput),
   };
 }
 
-function estimateCost(inputTokens: number, outputTokens: number): number {
+function estimateCostFromTokens(inputTokens: number, outputTokens: number): number {
   // Claude Sonnet 4.6 기준 추정: $3/M input, $15/M output
   return (inputTokens * 3 + outputTokens * 15) / 1_000_000;
 }

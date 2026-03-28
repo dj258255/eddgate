@@ -34,7 +34,7 @@ export async function renderTUI(result: WorkflowResult): Promise<void> {
           ? chalk.yellow("⚠ PARTIAL")
           : chalk.red("✗ FAILED");
 
-    console.log(chalk.bold(`  EDDOps TUI — ${result.workflowName}`));
+    console.log(chalk.bold(`  eddgate TUI — ${result.workflowName}`));
     console.log(
       `  ${statusIcon}  ${chalk.dim(`${(result.totalDurationMs / 1000).toFixed(1)}s · ${(result.totalTokens.input + result.totalTokens.output).toLocaleString()} tok · $${result.totalCostEstimate.toFixed(4)}`)}`,
     );

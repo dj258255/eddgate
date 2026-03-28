@@ -197,7 +197,7 @@ export interface WorkflowResult {
   totalCostEstimate: number;
 }
 
-// ─── Project Config (eddops.config.yaml) ─────────────────────
+// ─── Project Config (eddgate.config.yaml) ─────────────────────
 
 export interface ProjectConfig {
   model: ModelConfig;

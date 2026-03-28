@@ -1,4 +1,4 @@
-# EDDOps CLI: 아키텍처 스펙
+# eddgate CLI: 아키텍처 스펙
 
 > 버전: 0.1 (Draft)
 > 날짜: 2026-03-28
@@ -23,7 +23,7 @@ CRITICAL_ANALYSIS.md에서 검증된 현실적 제약을 반영한 원칙:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      EDDOps CLI                              │
+│                      eddgate CLI                              │
 │                                                              │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐    │
 │  │ Context  │  │ Workflow  │  │  Agent   │  │   Eval   │    │
@@ -142,7 +142,7 @@ interface ValidationRule {
 
 ```yaml
 # workflows/document-pipeline.yaml
-name: "EDDOps Document Pipeline"
+name: "eddgate Document Pipeline"
 description: "6단계 문서 처리 파이프라인 (실무 검증)"
 
 config:
@@ -348,7 +348,7 @@ interface AgentRole {
 
 ### 4. Eval Module
 
-**목적**: EDDOps 정신 — 평가가 사후가 아닌 설계에 내장. 단, 현실적으로.
+**목적**: eddgate 정신 — 평가가 사후가 아닌 설계에 내장. 단, 현실적으로.
 
 **CRITICAL_ANALYSIS 반영 — 3-tier 평가**:
 
@@ -530,7 +530,7 @@ otel (선택적) → OpenTelemetry 호환 백엔드
 
 ```
 project/
-├── eddops.config.yaml          # 프로젝트 설정 (모델, MCP, 트레이스)
+├── eddgate.config.yaml          # 프로젝트 설정 (모델, MCP, 트레이스)
 ├── workflows/
 │   ├── document-pipeline.yaml  # 6단계 문서 파이프라인
 │   ├── code-review.yaml        # 코드 리뷰 워크플로우
@@ -563,9 +563,9 @@ project/
     ▼
 ┌─ Config Store에서 워크플로우 로드 ─┐
 │                                    │
-│  eddops run document-pipeline      │
+│  eddgate run document-pipeline      │
 │  --input "사용자 문의 원문"         │
-│  --config ./eddops.config.yaml     │
+│  --config ./eddgate.config.yaml     │
 └────────────────────────────────────┘
     │
     ▼
@@ -638,7 +638,7 @@ WorkflowResult (단일 데이터 소스)
 
 ### HTMLRenderer (Phase 1)
 
-`eddops run ... --report report.html` → 싱글 HTML 파일 생성.
+`eddgate run ... --report report.html` → 싱글 HTML 파일 생성.
 - 의존성 0. 순수 HTML/CSS/JS 문자열 템플릿
 - 단계별 접기/펼치기, 평가 점수 게이지, 토큰/비용/시간 테이블
 - 파트너사에 파일 하나 보내면 끝
@@ -646,7 +646,7 @@ WorkflowResult (단일 데이터 소스)
 
 ### TUIRenderer (Phase 2)
 
-`eddops run ... --tui` → 실행 완료 후 인터랙티브 터미널 대시보드.
+`eddgate run ... --tui` → 실행 완료 후 인터랙티브 터미널 대시보드.
 - 단계 목록 + 상세 패널 (2-pane)
 - 화살표 키로 단계 이동, Enter로 입출력 보기
 - 평가 결과 하이라이트, 실패 단계 빨간색
@@ -658,20 +658,20 @@ WorkflowResult (단일 데이터 소스)
 
 ```bash
 # 워크플로우 실행
-eddops run <workflow> --input <file> [--report <path>] [--tui] [--trace-jsonl <path>]
+eddgate run <workflow> --input <file> [--report <path>] [--tui] [--trace-jsonl <path>]
 
 # 단일 단계만 실행 (디버깅용)
-eddops step <workflow> <step-id> --input <file>
+eddgate step <workflow> <step-id> --input <file>
 
 # 트레이스 조회
-eddops trace <trace-id-or-file> [--format json|summary]
+eddgate trace <trace-id-or-file> [--format json|summary]
 
 # 오프라인 평가
-eddops eval <workflow> [--dataset <path>] [--output <path>] [--model <model>]
+eddgate eval <workflow> [--dataset <path>] [--output <path>] [--model <model>]
 
 # 워크플로우/역할 목록
-eddops list workflows
-eddops list roles
+eddgate list workflows
+eddgate list roles
 ```
 
 ---
@@ -693,7 +693,7 @@ eddops list roles
 ## 프로젝트 디렉토리 구조
 
 ```
-eddops/
+eddgate/
 ├── package.json
 ├── tsconfig.json
 ├── README.md
@@ -705,12 +705,12 @@ eddops/
 │   ├── cli/                       # CLI 진입점
 │   │   ├── index.ts               # 메인 CLI
 │   │   ├── commands/
-│   │   │   ├── run.ts             # eddops run
-│   │   │   ├── step.ts            # eddops step
-│   │   │   ├── eval.ts            # eddops eval
-│   │   │   ├── trace.ts           # eddops trace
-│   │   │   ├── mcp.ts             # eddops mcp
-│   │   │   └── list.ts            # eddops list
+│   │   │   ├── run.ts             # eddgate run
+│   │   │   ├── step.ts            # eddgate step
+│   │   │   ├── eval.ts            # eddgate eval
+│   │   │   ├── trace.ts           # eddgate trace
+│   │   │   ├── mcp.ts             # eddgate mcp
+│   │   │   └── list.ts            # eddgate list
 │   │   └── utils/
 │   │
 │   ├── core/                      # 핵심 모듈
@@ -774,7 +774,7 @@ eddops/
 ### 왜 2-Tier인가
 
 비관적 분석 결과 (CRITICAL_ANALYSIS.md + 추가 검증):
-- **순수 플러그인**: 7단계 프롬프트 기반 = 32% E2E 성공률, EDDOps 핵심 가치(결정적 검증, 재현성) 파괴
+- **순수 플러그인**: 7단계 프롬프트 기반 = 32% E2E 성공률, eddgate 핵심 가치(결정적 검증, 재현성) 파괴
 - **순수 CLI**: 진입 장벽 높음 (API 키 + 크레딧), MetaGPT/CrewAI 레드오션
 - **2-Tier**: 코어 가치 유지 + 진입 장벽 제거
 
@@ -784,7 +784,7 @@ eddops/
 ┌───────────────────────────────────────────────┐
 │  Claude Code Plugin (입구, 시장 검증)           │
 │                                               │
-│  /eddops run document-pipeline                │
+│  /eddgate run document-pipeline                │
 │  - Max 구독으로 무료 실행                       │
 │  - 슬래시 커맨드 → CLI 코어 호출               │
 │  - LLM 호출만 Claude Code로 대체               │
@@ -796,7 +796,7 @@ eddops/
 ├───────────────────────────────────────────────┤
 │  Standalone CLI (본체, 기술적 해자)             │
 │                                               │
-│  eddops run document-pipeline --input q.txt   │
+│  eddgate run document-pipeline --input q.txt   │
 │  - 결정적 워크플로우 엔진                       │
 │  - Tier 1: Zod 검증 (오탐 0%)                 │
 │  - 구조화 JSONL 트레이스                       │
@@ -869,11 +869,11 @@ eddops/
                         │
                         │
         ────────────────┼──────────────────
-        단순함           │           EDDOps 평가
+        단순함           │           eddgate 평가
                         │            통합
                         │
-  SWE-Agent ●           │           ● EDDOps CLI ← 여기
-  (최소/학술)           │          (실용적 EDDOps)
+  SWE-Agent ●           │           ● eddgate CLI ← 여기
+  (최소/학술)           │          (실용적 eddgate)
                         │
         Aider ●         │
         (단일/대화형)    │
@@ -881,4 +881,4 @@ eddops/
                     복잡도 낮음
 ```
 
-**한 줄 포지셔닝**: "평가가 내장된 실용적 멀티에이전트 CLI. Ruflo의 야심 없이, SWE-Agent의 단순함으로, EDDOps의 정신을."
+**한 줄 포지셔닝**: "평가가 내장된 실용적 멀티에이전트 CLI. Ruflo의 야심 없이, SWE-Agent의 단순함으로, eddgate의 정신을."

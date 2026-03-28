@@ -6,19 +6,34 @@ import { listCommand } from "./commands/list.js";
 import { stepCommand } from "./commands/step.js";
 import { traceCommand } from "./commands/trace.js";
 import { evalCommand } from "./commands/eval.js";
+import { initCommand } from "./commands/init.js";
+import { doctorCommand } from "./commands/doctor.js";
 
 const program = new Command();
 
 program
-  .name("eddops")
+  .name("eddgate")
   .description("Evaluation-driven multi-agent workflow engine")
   .version("0.1.0");
+
+program
+  .command("init")
+  .description("Initialize eddgate project structure")
+  .option("-d, --dir <path>", "Project directory", ".")
+  .action(initCommand);
+
+program
+  .command("doctor")
+  .description("Check environment and config health")
+  .option("-c, --config <path>", "Config file", "./eddgate.config.yaml")
+  .option("-w, --workflows-dir <path>", "Workflows directory", "./workflows")
+  .action(doctorCommand);
 
 program
   .command("run <workflow>")
   .description("Run a workflow")
   .option("-i, --input <file>", "Input file or text")
-  .option("-c, --config <path>", "Project config file", "./eddops.config.yaml")
+  .option("-c, --config <path>", "Project config file", "./eddgate.config.yaml")
   .option("-w, --workflows-dir <path>", "Workflows directory", "./workflows")
   .option("-r, --roles-dir <path>", "Roles directory", "./roles")
   .option("-p, --prompts-dir <path>", "Prompts directory", "./prompts")
@@ -26,6 +41,10 @@ program
   .option("--report <path>", "Generate HTML report")
   .option("--trace-jsonl <path>", "Save JSONL trace")
   .option("--tui", "Show interactive TUI dashboard after completion")
+  .option("--max-budget-usd <amount>", "Maximum cost budget in USD", parseFloat)
+  .option("--verbose", "Verbose output")
+  .option("--quiet", "Minimal output (errors only)")
+  .option("--json", "Machine-readable JSON output")
   .option("--dry-run", "Preview workflow structure without executing")
   .action(runCommand);
 
