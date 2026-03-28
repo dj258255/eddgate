@@ -30,6 +30,7 @@ program
   .description("Check environment and config health")
   .option("-c, --config <path>", "Config file", "./eddgate.config.yaml")
   .option("-w, --workflows-dir <path>", "Workflows directory", "./workflows")
+  .option("--ci", "CI mode (Claude CLI check becomes warning instead of failure)")
   .action(doctorCommand);
 
 program

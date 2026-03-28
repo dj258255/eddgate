@@ -8,6 +8,7 @@ import { validateWorkflowGraph } from "../../core/graph-validator.js";
 interface DoctorOptions {
   config: string;
   workflowsDir: string;
+  ci?: boolean;
 }
 
 interface Check {
@@ -30,7 +31,8 @@ export async function doctorCommand(options: DoctorOptions): Promise<void> {
     message: `${nodeVersion} ${major >= 20 ? "" : "(requires >= 20)"}`,
   });
 
-  // 2. Claude Code CLI
+  // 2. Claude Code CLI (warn in CI, fail locally)
+  const isCI = options.ci || !!process.env.CI;
   try {
     const claudeVersion = execFileSync("claude", ["--version"], {
       encoding: "utf-8",
@@ -44,8 +46,10 @@ export async function doctorCommand(options: DoctorOptions): Promise<void> {
   } catch {
     checks.push({
       name: "Claude Code CLI",
-      status: "fail",
-      message: "not found. Install: npm install -g @anthropic-ai/claude-code",
+      status: isCI ? "warn" : "fail",
+      message: isCI
+        ? "not found (expected in CI, required for workflow execution)"
+        : "not found. Install: npm install -g @anthropic-ai/claude-code",
     });
   }
 

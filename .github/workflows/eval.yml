@@ -24,7 +24,7 @@ jobs:
         run: npm ci && npm run build
 
       - name: Validate workflow graphs
-        run: node dist/cli/index.js doctor -w templates/workflows
+        run: node dist/cli/index.js doctor --ci -w templates/workflows
 
       - name: Dry-run all workflows
         run: |
