@@ -364,51 +364,79 @@ async function handleRun(): Promise<void> {
 }
 
 async function handleAnalyze(): Promise<void> {
-  const ctx = await blessedConfirm(screen, { message: t("analyze.contextMode") });
-  const gen = await blessedConfirm(screen, { message: t("analyze.generateRules") });
-
-  // Run analyze and capture output
-  menuBox.hide();
-  contentBox.hide();
-
-  const outputBox = blessed.log({
-    parent: screen,
-    top: 1, left: 0, width: "100%", height: "100%-2",
-    tags: true,
-    border: { type: "line" },
-    style: { border: { fg: "yellow" } },
-    label: ` ${t("menu.analyze")} `,
-    scrollable: true,
-    alwaysScroll: true,
-    scrollbar: { style: { bg: "yellow" } },
-    mouse: true,
-    padding: { left: 1 },
+  const action = await blessedSelect(screen, {
+    message: t("menu.analyze"),
+    items: [
+      { value: "failure", label: t("panel.clusterPatterns") },
+      { value: "context", label: t("panel.contextProfiler") },
+      { value: "eval", label: "Offline eval (re-score traces)" },
+      { value: "diff-eval", label: "Diff eval (compare between commits)" },
+      { value: "version-diff", label: "Version diff (prompt changes)" },
+    ],
   });
+  if (!action) return;
 
-  // Capture console.log
-  const origLog = console.log;
-  console.log = (...args: unknown[]) => {
-    outputBox.log(args.map(String).join(" "));
-    screen.render();
-  };
+  if (action === "eval") {
+    await handleOfflineEval();
+    return;
+  }
 
-  const { analyzeCommand } = await import("./commands/analyze.js");
-  await analyzeCommand({ dir: "./traces", context: ctx, generateRules: gen, output: "./eval/rules" });
+  if (action === "diff-eval") {
+    const wfs = await findWorkflows("./workflows")
+      .then((w) => w.length > 0 ? w : findWorkflows("./templates/workflows"));
+    if (wfs.length === 0) { await blessedMessage(screen, "No workflows found.", { label: "Error" }); return; }
+    const wf = await blessedSelect(screen, {
+      message: "Select workflow",
+      items: wfs.map((w) => ({ value: w, label: w })),
+    });
+    if (!wf) return;
+    await runCapturedCommand("Diff Eval", "yellow", async () => {
+      const { diffEvalCommand } = await import("./commands/diff-eval.js");
+      await diffEvalCommand(wf, { before: "HEAD~1", after: "HEAD", dir: "./traces" });
+    });
+    await updateContent(1);
+    return;
+  }
 
-  console.log = origLog;
-  outputBox.log("\n{gray-fg}Press any key to return...{/gray-fg}");
-  screen.render();
+  if (action === "version-diff") {
+    await runCapturedCommand("Version Diff", "yellow", async () => {
+      const { versionDiffCommand } = await import("./commands/version-diff.js");
+      await versionDiffCommand({ commit: "HEAD~1", paths: "templates/prompts,templates/workflows" });
+    });
+    await updateContent(1);
+    return;
+  }
 
-  await new Promise<void>((res) => {
-    screen.onceKey(["escape", "q", "enter", "space"], () => res());
+  const ctx = action === "context";
+  const gen = action === "failure"
+    ? await blessedConfirm(screen, { message: t("analyze.generateRules") })
+    : false;
+
+  await runCapturedCommand(t("menu.analyze"), "yellow", async () => {
+    const { analyzeCommand } = await import("./commands/analyze.js");
+    await analyzeCommand({ dir: "./traces", context: ctx, generateRules: gen, output: "./eval/rules" });
   });
-
-  outputBox.destroy();
-  menuBox.show();
-  contentBox.show();
-  menuBox.focus();
   await updateContent(1);
-  screen.render();
+}
+
+async function handleOfflineEval(): Promise<void> {
+  const workflows = await findWorkflows("./workflows")
+    .then((w) => w.length > 0 ? w : findWorkflows("./templates/workflows"));
+  if (workflows.length === 0) {
+    await blessedMessage(screen, "No workflows found.", { label: "Error" });
+    return;
+  }
+  const wf = await blessedSelect(screen, {
+    message: "Select workflow to evaluate",
+    items: workflows.map((w) => ({ value: w, label: w })),
+  });
+  if (!wf) return;
+
+  await runCapturedCommand("Offline Eval", "yellow", async () => {
+    const { evalCommand } = await import("./commands/eval.js");
+    await evalCommand(wf, { workflowsDir: "./templates/workflows", model: "sonnet" });
+  });
+  await updateContent(1);
 }
 
 async function handleTest(): Promise<void> {
@@ -418,60 +446,25 @@ async function handleTest(): Promise<void> {
       { value: "snapshot", label: t("test.snapshot") },
       { value: "diff", label: t("test.diff") },
       { value: "list", label: t("test.listSnapshots") },
+      { value: "gate", label: "Deployment gate (check thresholds)" },
     ],
   });
   if (!action) return;
 
-  menuBox.hide();
-  contentBox.hide();
+  if (action === "gate") {
+    await runCapturedCommand("Deployment Gate", "red", async () => {
+      const { gateCommand } = await import("./commands/gate.js");
+      await gateCommand({ results: "./eval-results.json", rules: "./templates/gate-rules.yaml" });
+    });
+    await updateContent(2);
+    return;
+  }
 
-  const outputBox = blessed.log({
-    parent: screen,
-    top: 1, left: 0, width: "100%", height: "100%-2",
-    tags: true,
-    border: { type: "line" },
-    style: { border: { fg: "green" } },
-    label: ` ${t("menu.test")} `,
-    scrollable: true,
-    alwaysScroll: true,
-    scrollbar: { style: { bg: "green" } },
-    mouse: true,
-    padding: { left: 1 },
+  await runCapturedCommand(t("menu.test"), "green", async () => {
+    const { testCommand } = await import("./commands/test.js");
+    await testCommand(action, { dir: "./traces" });
   });
-
-  const origLog = console.log;
-  const origError = console.error;
-  console.log = (...args: unknown[]) => {
-    outputBox.log(args.map(String).join(" "));
-    screen.render();
-  };
-  console.error = console.log;
-
-  // Override process.exit so test diff doesn't kill us
-  const origExit = process.exit;
-  let exitCalled = false;
-  (process as any).exit = (code?: number) => { exitCalled = true; };
-
-  const { testCommand } = await import("./commands/test.js");
-  await testCommand(action, { dir: "./traces" });
-
-  console.log = origLog;
-  console.error = origError;
-  (process as any).exit = origExit;
-
-  outputBox.log("\n{gray-fg}Press any key to return...{/gray-fg}");
-  screen.render();
-
-  await new Promise<void>((res) => {
-    screen.onceKey(["escape", "q", "enter", "space"], () => res());
-  });
-
-  outputBox.destroy();
-  menuBox.show();
-  contentBox.show();
-  menuBox.focus();
   await updateContent(2);
-  screen.render();
 }
 
 async function handleMonitor(): Promise<void> {
@@ -624,6 +617,8 @@ async function handleSettings(): Promise<void> {
       { value: "model", label: `${t("settings.defaultModel")}: ${model.default}` },
       { value: "language", label: `${t("settings.language")}: ${currentLang === "ko" ? "한국어" : "English"}` },
       { value: "view", label: t("settings.viewConfig") },
+      { value: "doctor", label: "Doctor (health check)" },
+      { value: "init", label: "Init (scaffold project)" },
     ],
   });
   if (!setting) return;
@@ -675,6 +670,23 @@ async function handleSettings(): Promise<void> {
       const raw = await readFile(configPath, "utf-8");
       await blessedMessage(screen, raw, { label: "eddgate.config.yaml" });
     } catch { /* */ }
+    return;
+  }
+
+  if (setting === "doctor") {
+    await runCapturedCommand("Doctor", "green", async () => {
+      const { doctorCommand } = await import("./commands/doctor.js");
+      await doctorCommand({ config: "./eddgate.config.yaml", workflowsDir: "./templates/workflows" });
+    });
+    return;
+  }
+
+  if (setting === "init") {
+    await runCapturedCommand("Init", "cyan", async () => {
+      const { initCommand } = await import("./commands/init.js");
+      await initCommand({ dir: "." });
+    });
+    await updateContent(7);
   }
 }
 
@@ -684,6 +696,8 @@ async function handlePlugins(): Promise<void> {
     items: [
       { value: "workflows", label: "Workflows", hint: "installed workflow templates" },
       { value: "roles", label: "Roles", hint: "installed role definitions" },
+      { value: "viz", label: "Visualize workflow", hint: "ASCII or Mermaid diagram" },
+      { value: "step", label: "Debug single step", hint: "run one step in isolation" },
       { value: "import-wf", label: "Import workflow", hint: "from file" },
       { value: "import-role", label: "Import role", hint: "from file" },
     ],
@@ -719,6 +733,53 @@ async function handlePlugins(): Promise<void> {
       const content = roles.map((r, i) => `  ${i + 1}. {cyan-fg}${r}{/cyan-fg}`).join("\n");
       await blessedMessage(screen, `{bold}Installed Roles:{/bold}\n\n${content}`, { label: "Roles" });
     }
+    return;
+  }
+
+  if (action === "viz") {
+    const wfs = await findWorkflows("./workflows")
+      .then((w) => w.length > 0 ? w : findWorkflows("./templates/workflows"));
+    if (wfs.length === 0) { await blessedMessage(screen, "No workflows found.", { label: "Error" }); return; }
+    const wf = await blessedSelect(screen, {
+      message: "Select workflow to visualize",
+      items: wfs.map((w) => ({ value: w, label: w })),
+    });
+    if (!wf) return;
+    await runCapturedCommand("Workflow Viz", "cyan", async () => {
+      const { vizCommand } = await import("./commands/viz.js");
+      await vizCommand(wf, { workflowsDir: "./templates/workflows", format: "ascii" });
+    });
+    return;
+  }
+
+  if (action === "step") {
+    const wfs = await findWorkflows("./workflows")
+      .then((w) => w.length > 0 ? w : findWorkflows("./templates/workflows"));
+    if (wfs.length === 0) { await blessedMessage(screen, "No workflows found.", { label: "Error" }); return; }
+    const wf = await blessedSelect(screen, {
+      message: "Select workflow",
+      items: wfs.map((w) => ({ value: w, label: w })),
+    });
+    if (!wf) return;
+
+    // Load step list
+    const { loadWorkflow: loadWf } = await import("../config/loader.js");
+    let wfDir = resolve("./workflows");
+    try { await readdir(wfDir); } catch { wfDir = resolve("./templates/workflows"); }
+    const workflow = await loadWf(resolve(wfDir, `${wf}.yaml`));
+    const stepId = await blessedSelect(screen, {
+      message: "Select step to debug",
+      items: workflow.steps.map((s: any) => ({ value: s.id, label: `${s.id} (${s.type})` })),
+    });
+    if (!stepId) return;
+
+    const inputVal = await blessedInput(screen, { message: "Input text" });
+    if (!inputVal) return;
+
+    await runCapturedCommand(`Step: ${stepId}`, "cyan", async () => {
+      const { stepCommand } = await import("./commands/step.js");
+      await stepCommand(wf, stepId, { input: inputVal, workflowsDir: wfDir, promptsDir: "./templates/prompts" });
+    });
     return;
   }
 
@@ -964,6 +1025,57 @@ async function renderPluginsPanel(): Promise<string> {
     `  {gray-fg}${t("panel.pressEnterManage")}{/gray-fg}`,
   );
   return lines.join("\n");
+}
+
+// ─── Shared: capture CLI command output in blessed log ─
+
+async function runCapturedCommand(label: string, color: string, fn: () => Promise<void>): Promise<void> {
+  menuBox.hide();
+  contentBox.hide();
+
+  const outputBox = blessed.log({
+    parent: screen,
+    top: 1, left: 0, width: "100%", height: "100%-2",
+    tags: true,
+    border: { type: "line" },
+    style: { border: { fg: color } },
+    label: ` ${label} `,
+    scrollable: true, alwaysScroll: true,
+    scrollbar: { style: { bg: color } },
+    mouse: true,
+    padding: { left: 1 },
+  });
+
+  const origLog = console.log;
+  const origError = console.error;
+  console.log = (...args: unknown[]) => { outputBox.log(args.map(String).join(" ")); screen.render(); };
+  console.error = console.log;
+
+  const origExit = process.exit;
+  (process as any).exit = () => {};
+
+  try {
+    await fn();
+  } catch (err) {
+    outputBox.log(`{red-fg}Error: ${err instanceof Error ? err.message : String(err)}{/red-fg}`);
+  }
+
+  console.log = origLog;
+  console.error = origError;
+  (process as any).exit = origExit;
+
+  outputBox.log("\n{gray-fg}Press any key to return...{/gray-fg}");
+  screen.render();
+
+  await new Promise<void>((res) => {
+    screen.onceKey(["escape", "q", "enter", "space"], () => res());
+  });
+
+  outputBox.destroy();
+  menuBox.show();
+  contentBox.show();
+  menuBox.focus();
+  screen.render();
 }
 
 // ─── Helpers ─────────────────────────────────────────
