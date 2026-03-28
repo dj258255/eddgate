@@ -1,5 +1,5 @@
 import blessed from "neo-blessed";
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile, writeFile, appendFile } from "node:fs/promises";
 import { resolve, extname, basename } from "node:path";
 import { initLang, t } from "../i18n/index.js";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
@@ -7,6 +7,15 @@ import { blessedSelect, blessedInput, blessedConfirm, blessedMessage } from "./b
 import { blessedFileBrowser } from "./blessed-file-browser.js";
 import { getClaudePlugins, getClaudeMcpServers, formatPluginList, formatMcpList } from "./claude-integration.js";
 import { MODELS, EFFORTS, THINKING_OPTIONS } from "./models.js";
+import {
+  showMonitorStatus,
+  showMonitorCost,
+  showMonitorQuality,
+  getTraceFiles,
+  showTraceTimeline,
+  showRunResults,
+} from "./blessed-panels.js";
+import { loadAllTraces } from "../trace/trace-loader.js";
 
 /**
  * Full blessed TUI -- orchestration dashboard + all interactions stay in blessed.
@@ -52,6 +61,8 @@ export async function launchBlessedTUI(): Promise<void> {
       `  ${t("menu.run")}`,
       `  ${t("menu.analyze")}`,
       `  ${t("menu.test")}`,
+      `  ${t("menu.monitor")}`,
+      `  ${t("menu.traces")}`,
       `  ${t("menu.mcp")}`,
       `  Plugins`,
       `  ${t("menu.config")}`,
@@ -85,7 +96,7 @@ export async function launchBlessedTUI(): Promise<void> {
   menuBox.on("select item", async (_: unknown, i: number) => { await updateContent(i); });
 
   menuBox.on("select", async (_: unknown, i: number) => {
-    if (i === 6) { quit(); return; } // Exit is now index 6
+    if (i === 8) { quit(); return; } // Exit is index 8
     await handleInBlessed(i);
   });
 
@@ -118,9 +129,11 @@ async function handleInBlessed(index: number): Promise<void> {
   if (index === 0) await handleRun();
   if (index === 1) await handleAnalyze();
   if (index === 2) await handleTest();
-  if (index === 3) await handleMcp();
-  if (index === 4) await handlePlugins();
-  if (index === 5) await handleSettings();
+  if (index === 3) await handleMonitor();
+  if (index === 4) await handleTraces();
+  if (index === 5) await handleMcp();
+  if (index === 6) await handlePlugins();
+  if (index === 7) await handleSettings();
 }
 
 async function handleRun(): Promise<void> {
@@ -179,8 +192,45 @@ async function handleRun(): Promise<void> {
   });
   if (!thinking) return;
 
-  const confirmed = await blessedConfirm(screen, { message: `Run ${wf} with ${model}?` });
-  if (!confirmed) return;
+  // Run options: report, trace, budget, dry-run
+  let reportPath: string | null = null;
+  let tracePath: string | null = null;
+  let maxBudget: number | null = null;
+  let dryRun = false;
+
+  let optionsDone = false;
+  while (!optionsDone) {
+    const items = [
+      { value: "start", label: t("run.optionStart"), hint: [
+        reportPath ? `report:${reportPath}` : null,
+        tracePath ? `trace:${tracePath}` : null,
+        maxBudget ? `budget:$${maxBudget}` : null,
+        dryRun ? "dry-run" : null,
+      ].filter(Boolean).join(", ") || undefined },
+      { value: "report", label: `${t("run.optionReport")}${reportPath ? ` [${reportPath}]` : ""}` },
+      { value: "trace", label: `${t("run.optionTrace")}${tracePath ? ` [${tracePath}]` : ""}` },
+      { value: "budget", label: `${t("run.optionBudget")}${maxBudget ? ` [$${maxBudget}]` : ""}` },
+      { value: "dryrun", label: `${t("run.optionDryRun")}${dryRun ? " [ON]" : ""}` },
+    ];
+
+    const opt = await blessedSelect(screen, { message: t("run.options"), items });
+    if (!opt) return; // Esc cancels
+
+    if (opt === "start") {
+      optionsDone = true;
+    } else if (opt === "report") {
+      const p = await blessedInput(screen, { message: t("run.reportPath") });
+      reportPath = p && p.trim() ? p.trim() : null;
+    } else if (opt === "trace") {
+      const p = await blessedInput(screen, { message: t("run.tracePath") });
+      tracePath = p && p.trim() ? p.trim() : null;
+    } else if (opt === "budget") {
+      const b = await blessedInput(screen, { message: t("run.budget") });
+      maxBudget = b && !isNaN(Number(b)) ? Number(b) : null;
+    } else if (opt === "dryrun") {
+      dryRun = !dryRun;
+    }
+  }
 
   // Clear main panels for dashboard
   menuBox.hide();
@@ -199,6 +249,48 @@ async function handleRun(): Promise<void> {
   const { loadWorkflow, loadPrompt } = await import("../config/loader.js");
   const workflow = await loadWorkflow(resolve(wfDir, `${wf}.yaml`));
   workflow.config.defaultModel = model;
+
+  // Dry run: show structure and return
+  if (dryRun) {
+    const outputBox = blessed.log({
+      parent: screen,
+      top: 1, left: 0, width: "100%", height: "100%-2",
+      tags: true,
+      border: { type: "line" },
+      style: { border: { fg: "cyan" } },
+      label: " Dry Run ",
+      scrollable: true, alwaysScroll: true,
+      scrollbar: { style: { bg: "cyan" } },
+      mouse: true,
+      padding: { left: 1 },
+    });
+
+    outputBox.log(`{bold}${workflow.name}{/bold}`);
+    outputBox.log(`{gray-fg}${workflow.description}{/gray-fg}`);
+    outputBox.log(`  model: ${workflow.config.defaultModel}`);
+    outputBox.log(`  topology: ${workflow.config.topology}`);
+    outputBox.log("");
+    for (const step of workflow.steps) {
+      const deps = step.dependsOn?.join(", ") ?? "none";
+      const hasRules = step.validation?.rules.length ? " {green-fg}[T1:rules]{/green-fg}" : "";
+      const hasEval = step.evaluation?.enabled ? ` {yellow-fg}[T2:${step.evaluation.type}]{/yellow-fg}` : "";
+      outputBox.log(`  {cyan-fg}${step.id}{/cyan-fg} - ${step.name} (${step.type})${hasRules}${hasEval}`);
+      outputBox.log(`    {gray-fg}deps: ${deps}{/gray-fg}`);
+    }
+    outputBox.log("\n{gray-fg}Press any key to return...{/gray-fg}");
+    screen.render();
+
+    await new Promise<void>((res) => {
+      screen.onceKey(["escape", "q", "enter", "space"], () => res());
+    });
+    outputBox.destroy();
+    menuBox.show();
+    contentBox.show();
+    menuBox.focus();
+    await updateContent(0);
+    screen.render();
+    return;
+  }
 
   // Load role prompts
   const rolePrompts = new Map<string, string>();
@@ -219,20 +311,51 @@ async function handleRun(): Promise<void> {
   });
 
   // Run with tracer connected to dashboard
-  const { TraceEmitter } = await import("../trace/emitter.js");
+  const { TraceEmitter, createJsonlListener } = await import("../trace/emitter.js");
   const tracer = new TraceEmitter();
   tracer.onEvent(dashboard.onEvent);
 
+  // JSONL trace output (if configured in options)
+  if (tracePath) {
+    const traceFullPath = resolve(tracePath);
+    tracer.onEvent(
+      createJsonlListener((line) => {
+        appendFile(traceFullPath, line + "\n").catch(() => {});
+      }),
+    );
+  }
+
   const { executeWorkflow } = await import("../core/workflow-engine.js");
 
-  await executeWorkflow({ workflow, input, rolePrompts, tracer });
+  const result = await executeWorkflow({
+    workflow,
+    input,
+    rolePrompts,
+    tracer,
+    maxBudgetUsd: maxBudget ?? undefined,
+  });
 
-  // Wait for key, then return to main menu
+  // HTML report (if configured in options)
+  if (reportPath && result) {
+    try {
+      const { renderHTMLReport } = await import("../render/html-report.js");
+      const html = renderHTMLReport(result);
+      await writeFile(resolve(reportPath), html, "utf-8");
+    } catch { /* report generation failure is non-fatal */ }
+  }
+
+  // Wait briefly, then switch to results panel
   await new Promise<void>((res) => {
     screen.onceKey(["escape", "q", "enter", "space"], () => res());
   });
 
   dashboard.destroy();
+
+  // Show blessed-native results panel with table/gauge
+  if (result) {
+    await showRunResults(screen, result);
+  }
+
   menuBox.show();
   contentBox.show();
   menuBox.focus();
@@ -351,6 +474,56 @@ async function handleTest(): Promise<void> {
   screen.render();
 }
 
+async function handleMonitor(): Promise<void> {
+  const action = await blessedSelect(screen, {
+    message: t("panel.monitorTitle"),
+    items: [
+      { value: "status", label: t("panel.monitorStatus") },
+      { value: "cost", label: t("panel.monitorCost") },
+      { value: "quality", label: t("panel.monitorQuality") },
+    ],
+  });
+  if (!action) return;
+
+  menuBox.hide();
+  contentBox.hide();
+
+  if (action === "status") await showMonitorStatus(screen);
+  else if (action === "cost") await showMonitorCost(screen);
+  else if (action === "quality") await showMonitorQuality(screen);
+
+  menuBox.show();
+  contentBox.show();
+  menuBox.focus();
+  await updateContent(3);
+  screen.render();
+}
+
+async function handleTraces(): Promise<void> {
+  const files = await getTraceFiles();
+  if (files.length === 0) {
+    await blessedMessage(screen, t("analyzeOutput.noTraces"), { label: "Traces" });
+    return;
+  }
+
+  const file = await blessedSelect(screen, {
+    message: t("panel.tracesTitle"),
+    items: files.map((f) => ({ value: f, label: f })),
+  });
+  if (!file) return;
+
+  menuBox.hide();
+  contentBox.hide();
+
+  await showTraceTimeline(screen, `./traces/${file}`);
+
+  menuBox.show();
+  contentBox.show();
+  menuBox.focus();
+  await updateContent(4);
+  screen.render();
+}
+
 async function handleMcp(): Promise<void> {
   const configPath = resolve("./eddgate.config.yaml");
   let config: Record<string, unknown> = {};
@@ -409,7 +582,7 @@ async function handleMcp(): Promise<void> {
     config.mcp = mcp;
     await writeFile(configPath, stringifyYaml(config), "utf-8");
     await blessedMessage(screen, `{green-fg}${t("mcp.added")}: ${name}{/green-fg}`, { label: "MCP", height: 5 });
-    await updateContent(3);
+    await updateContent(5);
     return;
   }
 
@@ -428,7 +601,7 @@ async function handleMcp(): Promise<void> {
     config.mcp = mcp;
     await writeFile(configPath, stringifyYaml(config), "utf-8");
     await blessedMessage(screen, `{green-fg}${t("mcp.removed")}: ${toRemove}{/green-fg}`, { label: "MCP", height: 5 });
-    await updateContent(3);
+    await updateContent(5);
   }
 }
 
@@ -468,7 +641,7 @@ async function handleSettings(): Promise<void> {
     config.model = model;
     await writeFile(configPath, stringifyYaml(config), "utf-8");
     await blessedMessage(screen, `{green-fg}Model: ${newModel}{/green-fg}`, { label: "Settings", height: 5 });
-    await updateContent(4);
+    await updateContent(7);
     return;
   }
 
@@ -562,7 +735,7 @@ async function handlePlugins(): Promise<void> {
     } catch (err) {
       await blessedMessage(screen, `{red-fg}Error: ${err}{/red-fg}`, { label: "Import", height: 5 });
     }
-    await updateContent(4);
+    await updateContent(6);
     return;
   }
 
@@ -579,7 +752,7 @@ async function handlePlugins(): Promise<void> {
     } catch (err) {
       await blessedMessage(screen, `{red-fg}Error: ${err}{/red-fg}`, { label: "Import", height: 5 });
     }
-    await updateContent(4);
+    await updateContent(6);
   }
 }
 
@@ -588,6 +761,7 @@ async function handlePlugins(): Promise<void> {
 async function updateContent(index: number): Promise<void> {
   const labels = [
     ` ${t("menu.run")} `, ` ${t("menu.analyze")} `, ` ${t("menu.test")} `,
+    ` ${t("menu.monitor")} `, ` ${t("menu.traces")} `,
     ` ${t("menu.mcp")} `, " Plugins ", ` ${t("menu.config")} `,
   ];
   contentBox.setLabel(labels[index] ?? "");
@@ -596,9 +770,11 @@ async function updateContent(index: number): Promise<void> {
     case 0: contentBox.setContent(await renderRunPanel()); break;
     case 1: contentBox.setContent(await renderAnalyzePanel()); break;
     case 2: contentBox.setContent(await renderTestPanel()); break;
-    case 3: contentBox.setContent(await renderMcpPanel()); break;
-    case 4: contentBox.setContent(await renderPluginsPanel()); break;
-    case 5: contentBox.setContent(await renderSettingsPanel()); break;
+    case 3: contentBox.setContent(await renderMonitorPanel()); break;
+    case 4: contentBox.setContent(await renderTracesPanel()); break;
+    case 5: contentBox.setContent(await renderMcpPanel()); break;
+    case 6: contentBox.setContent(await renderPluginsPanel()); break;
+    case 7: contentBox.setContent(await renderSettingsPanel()); break;
   }
   screen.render();
 }
@@ -659,6 +835,44 @@ async function renderTestPanel(): Promise<string> {
     `    {red-fg}${t("panel.exitOnRegression")}{/red-fg}`, "",
     `  {gray-fg}${t("panel.pressEnterTest")}{/gray-fg}`,
   ].join("\n");
+}
+
+async function renderMonitorPanel(): Promise<string> {
+  let traceCount = 0;
+  let wfCount = 0;
+  let totalCost = 0;
+  try {
+    const events = await loadAllTraces(resolve("./traces"));
+    traceCount = events.length;
+    wfCount = events.filter((e) => e.type === "workflow_end").length;
+    totalCost = events.filter((e) => e.type === "llm_call").reduce((s, e) => s + (e.data.cost ?? 0), 0);
+  } catch { /* */ }
+  return [
+    "", `  {bold}{cyan-fg}${t("panel.monitorTitle")}{/cyan-fg}{/bold}`, "",
+    `  {bold}Events:{/bold}    ${traceCount}`,
+    `  {bold}Workflows:{/bold} ${wfCount}`,
+    `  {bold}Cost:{/bold}      {green-fg}$${totalCost.toFixed(4)}{/green-fg}`, "",
+    `  {cyan-fg}-{/cyan-fg} ${t("panel.monitorStatus")}`,
+    `  {cyan-fg}-{/cyan-fg} ${t("panel.monitorCost")}`,
+    `  {cyan-fg}-{/cyan-fg} ${t("panel.monitorQuality")}`, "",
+    `  {gray-fg}${t("panel.pressEnterMonitor")}{/gray-fg}`,
+  ].join("\n");
+}
+
+async function renderTracesPanel(): Promise<string> {
+  const files = await getTraceFiles();
+  const lines = [
+    "", `  {bold}{magenta-fg}${t("panel.tracesTitle")}{/magenta-fg}{/bold}`, "",
+    `  {bold}${t("panel.traceFiles")}{/bold}  ${files.length}`, "",
+  ];
+  for (const f of files.slice(0, 10)) {
+    lines.push(`    {magenta-fg}>{/magenta-fg} ${f}`);
+  }
+  if (files.length > 10) {
+    lines.push(`    {gray-fg}... +${files.length - 10} more{/gray-fg}`);
+  }
+  lines.push("", `  {gray-fg}${t("panel.pressEnterTraces")}{/gray-fg}`);
+  return lines.join("\n");
 }
 
 async function renderMcpPanel(): Promise<string> {
