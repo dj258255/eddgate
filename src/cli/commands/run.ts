@@ -128,7 +128,27 @@ export async function runCommand(
 
     // 트레이서 설정
     const tracer = new TraceEmitter();
-    if (!options.quiet && !options.json) {
+    let inkCleanup: (() => void) | null = null;
+
+    const useDashboard = !options.quiet && !options.json && !options.dryRun && process.stdout.isTTY;
+
+    if (useDashboard) {
+      try {
+        const { renderInkDashboard } = await import("../../render/ink-dashboard.js");
+        const stepIds = workflow.steps.map((s) => s.id);
+        const { unmount } = renderInkDashboard(
+          workflow.name,
+          stepIds,
+          tracer,
+          workflow.config.defaultModel,
+          options.effort ?? "medium",
+        );
+        inkCleanup = unmount;
+      } catch {
+        // Ink not available, fallback to stdout
+        tracer.onEvent(createStdoutListener());
+      }
+    } else if (!options.quiet && !options.json) {
       tracer.onEvent(createStdoutListener());
     }
 
@@ -158,8 +178,8 @@ export async function runCommand(
       }
     }
 
-    // 실행
-    if (!options.quiet && !options.json) {
+    // 실행 (Ink 대시보드 사용 시 헤더 생략)
+    if (!useDashboard && !options.quiet && !options.json) {
       console.log(
         chalk.bold(`\n${workflow.name}`),
         chalk.dim(`(${workflow.steps.length} steps, ${workflow.config.topology})`),
@@ -178,6 +198,13 @@ export async function runCommand(
       tracer,
       maxBudgetUsd: options.maxBudgetUsd,
     });
+
+    // Ink 대시보드 정리
+    if (inkCleanup) {
+      // 잠시 대기 후 unmount (마지막 이벤트 렌더링 완료 대기)
+      await new Promise((r) => setTimeout(r, 500));
+      inkCleanup();
+    }
 
     // 결과 출력
     if (options.json) {
