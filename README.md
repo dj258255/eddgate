@@ -313,6 +313,8 @@ All TUI actions are also available as commands for scripting and CI pipelines.
 | `eddgate advanced rag index` | Chunk documents and upsert to Pinecone via MCP. |
 | `eddgate advanced rag search <query>` | Search Pinecone index, return ranked chunks. |
 | `eddgate advanced ab-test` | Run same workflow with two prompt variants, compare scores. |
+| `eddgate advanced improve` | Auto-suggest prompt fixes from failure analysis. `--apply` to auto-write. |
+| `eddgate serve` | Start HTTP API server for workflow execution. `--port 3000` |
 
 ## RAG Pipeline (Pinecone MCP)
 
@@ -467,6 +469,128 @@ Default: **0.7** (industry standard for LLM-as-judge).
 | < 0.7 | Fail -- gate blocks, retry or stop |
 
 Configurable per step in workflow YAML. `eddgate analyze` suggests adjusted thresholds based on observed score ranges.
+
+## Auto Prompt Improvement
+
+**When to use**: You ran a workflow, some steps failed, and you want to know *how to fix the prompt* -- not just *that it failed*. This reads your failure patterns and generates concrete prompt edits, then lets you review each one before applying.
+
+```bash
+# CLI: auto-suggest and apply
+eddgate advanced improve -d traces --prompts templates/prompts --apply
+
+# CLI: preview only
+eddgate advanced improve -d traces --prompts templates/prompts --dry-run
+```
+
+Or from the TUI: **Analyze > Auto-improve prompts**.
+
+### How it works
+
+```
+1. Reads traces/*.jsonl -> finds failure clusters (same as Analyze)
+2. For each failing step, loads the prompt file (templates/prompts/<role>.md)
+3. Sends current prompt + failure patterns to LLM -> gets rewritten prompt
+4. Shows you the diff: original (left) vs suggested (right)
+5. You choose: Approve / Modify / Skip for each suggestion
+6. Approved changes are written to the prompt file immediately
+```
+
+### TUI approval flow
+
+```
++--- Original Prompt ---+--- Suggested Prompt ---+
+| You are an analyst.   | You are an analyst.    |
+| Extract key topics.   | Extract key topics.    |
+|                       | Output MUST be JSON.   |  <- added
+|                       | Example: {"topics":..} |  <- added
++-----------------------+------------------------+
+|  [Approve]  [Modify]  [Skip]                   |
++------------------------------------------------+
+```
+
+Each suggestion includes confidence level (high/medium/low) and the failure pattern that triggered it.
+
+## API Server
+
+**When to use**: You want to trigger eddgate workflows from another system (a web app, a Slack bot, a cron job) without using the CLI directly.
+
+```bash
+eddgate serve --port 3000
+```
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Health check (status, version, uptime) |
+| `GET` | `/workflows` | List available workflow YAML files |
+| `POST` | `/run` | Start a workflow (returns runId immediately) |
+| `GET` | `/runs` | List all runs with status |
+| `GET` | `/runs/:id` | Get run result (steps, tokens, cost, eval scores) |
+
+### Example
+
+```bash
+# Start server
+eddgate serve --port 3000
+
+# From another terminal:
+# Start a workflow
+curl -X POST http://localhost:3000/run \
+  -H "Content-Type: application/json" \
+  -d '{"workflow": "document-pipeline", "input": "Summarize this report..."}'
+# -> {"runId": "run-1711...", "status": "running"}
+
+# Check status
+curl http://localhost:3000/runs/run-1711...
+# -> {"status": "completed", "result": {"totalCost": 0.02, "steps": [...]}}
+```
+
+Workflows execute asynchronously -- POST /run returns immediately with a `runId`, then you poll GET /runs/:id for the result. No external dependencies (uses Node.js built-in `http` module).
+
+## Cross-Run Memory
+
+**When to use**: You don't need to configure anything. This works automatically. Every time you run a workflow, eddgate remembers what happened (which steps failed, what scores were, what errors occurred). Next time you run the same workflow, that knowledge is injected into the AI's system prompt so it can avoid previous mistakes.
+
+### How it works
+
+```
+Run #1: "validate_final" fails 3 times with "missing citations"
+        -> saved to .eddgate/memory/
+
+Run #2: System prompt now includes:
+        "Previous Run Insights (1 run, 0% success rate)
+         Known issues: validate_final failed 3x: missing citations
+         Avg quality: validate_final: 0.45 (problematic)"
+        -> AI knows to add citations this time
+```
+
+### What gets stored
+
+Stored in `.eddgate/memory/` as JSON files (max 50, auto-pruned):
+
+- Workflow name, status, duration, cost
+- Per-step: status, eval score, error message
+- Aggregated into: success rate, top issues, avg scores per step
+
+### What gets injected
+
+Before each run, a concise summary is built and appended to every agent's system prompt:
+
+```
+## Previous Run Insights (5 runs, 60% success rate)
+
+Known issues from previous runs:
+- validate_final: 3 failures (missing required citations)
+- generate_draft: 2 failures (output too short)
+
+Average quality scores by step:
+- classify_input: 0.85 (good)
+- generate_draft: 0.52 (needs attention)
+- validate_final: 0.45 (problematic)
+```
+
+This is automatic and non-blocking -- if memory loading fails, the workflow runs normally without it.
 
 ## CI/CD Integration
 

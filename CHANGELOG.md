@@ -2,7 +2,13 @@
 
 ## 0.1.0 (2026-03-29) -- Refactor
 
-Critical bug fixes, comprehensive test suite, Liquid Glass TUI theme, UX improvements.
+Critical bug fixes, comprehensive test suite, Liquid Glass TUI theme, UX improvements, new features.
+
+### New Features (Post-Refactor)
+- Auto prompt improvement: analyze failures -> LLM-generated prompt patches -> TUI approve/modify/skip
+- API server (`eddgate serve`): HTTP endpoints for workflow execution (POST /run, GET /runs/:id)
+- Cross-run memory: auto-save run results to .eddgate/memory/, inject insights into next run's system prompt
+- Human-in-the-loop: TUI-based diff review for prompt changes with approve/modify/skip flow
 
 ### Critical Fixes
 - workflow-engine: cycle detection in topologicalSort (was silently producing wrong order)
