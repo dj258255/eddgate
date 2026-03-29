@@ -1,8 +1,71 @@
 # Changelog
 
-## 0.1.0 (2026-03-29)
+## 0.1.0 (2026-03-29) -- Refactor
 
-Initial release. Self-improving evaluation loop for LLM workflows.
+Critical bug fixes, comprehensive test suite, Liquid Glass TUI theme, UX improvements.
+
+### Critical Fixes
+- workflow-engine: cycle detection in topologicalSort (was silently producing wrong order)
+- workflow-engine: parallel budget tracking (was unlimited cost in parallel layers)
+- workflow-engine: fan-in merges all dependencies (was using only the last one)
+- workflow-engine: retry policy implementation (was declared but ignored)
+- workflow-engine: error context preserved in StepResult.error field
+- workflow-engine: p-limit concurrency control (prevents rate limiting)
+- agent-runner: jitter on exponential backoff (prevents thundering herd)
+- agent-runner: structured error detection via statusCode
+- agent-runner: safe score extraction (rejects non-score numbers)
+- agent-runner: groundedness eval now receives source context
+- agent-runner: evaluation retry (2 attempts) with separate trace ID
+- tier1-rules: minItems metadata key separation (was treated as schema field)
+- tier1-rules: markdown format check uses real patterns (was trivially bypassable)
+- tier1-rules: unknown custom check returns false (was silently passing)
+- tier2-llm: connected to workflow engine (was dead code)
+- trace/emitter: async listener errors safely caught
+- trace/emitter: parentSpanId for span hierarchy
+- trace/emitter: toolCall() convenience method
+- trace/emitter: MAX_BUFFER_SIZE (10K) + flush()
+
+### New Features
+- 3 new validation rule types: range, enum, not_empty
+- Welch's t-test for A/B prompt comparison (p-value, confidence interval)
+- A/B test interleaving (ABABAB) to eliminate ordering bias
+- RAG pipeline: heading-aware chunking, diversity reranking, tracer integration
+- context-builder: state transition validation, safe JSON truncation, MCP tool validation
+
+### Liquid Glass TUI Theme
+- Apple Liquid Glass-inspired design: layered depth, frosted borders, cool blue-cyan palette
+- Applied to: main screen, run dashboard, panels, split view, captured command output
+- Unicode glyphs throughout (check/x/warning/diamond/block chars)
+- theme.ts design system with palette, glyphs, style presets, formatting helpers
+
+### UX Improvements
+- File browser replaces text input for all path selections
+- Help system: ? key shows context-sensitive help overlay per menu
+- Help text in i18n (en.json + ko.json) with concrete scenarios and file examples
+- All panel hints show "Press ? for help"
+- ANSI/chalk code stripping in captured command output
+
+### Documentation
+- README: "When Do I Use This?" section with scenario table
+- README: concrete Built-in Workflows table (what to feed, what you get)
+- README: "when to use" for every major feature section
+- i18n help: beginner-friendly Korean with real file names and step-by-step guides
+- docs/REFACTOR-REPORT.md: complete audit trail
+
+### Test Suite
+- 219 tests across 10 files (was 3 tests in 1 meaningful file)
+- New: workflow-engine.test.ts (18), tier1-rules.test.ts (72), normalize-score.test.ts (26)
+- New: trace-emitter.test.ts (30), context-builder.test.ts (27), rag-pipeline.test.ts (18)
+- Mock LLM adapter for deterministic engine testing
+
+### Dependencies
+- Added: p-limit (concurrency control)
+- Added: peerDependencies for langfuse and @opentelemetry/api (optional)
+- Added: pretest build hook
+
+## 0.1.0 (2026-03-28) -- Initial Release
+
+Self-improving evaluation loop for LLM workflows.
 
 ### Core Loop
 
@@ -87,7 +150,7 @@ Advanced (under `eddgate advanced`):
 
 ### Templates
 
-- 5 workflows: document-pipeline, code-review, bug-fix, api-design, translation
+- 6 workflows: document-pipeline, code-review, bug-fix, api-design, translation, rag-pipeline
 - 8 role definitions + prompts
 - gate-rules.yaml for deployment gates
 
@@ -111,4 +174,4 @@ Advanced (under `eddgate advanced`):
 
 ### Tests
 
-- 63 tests passing (unit + integration)
+- 63 tests at initial release

@@ -3,6 +3,7 @@ import { resolve, join, extname } from "node:path";
 import chalk from "chalk";
 import { chunkText, indexDocuments, searchDocuments } from "../../core/rag-pipeline.js";
 import type { RAGConfig } from "../../types/index.js";
+import { TraceEmitter, createStdoutListener } from "../../trace/emitter.js";
 
 interface RAGIndexOptions {
   dir: string;
@@ -62,7 +63,9 @@ export async function ragIndexCommand(options: RAGIndexOptions): Promise<void> {
     chunkOverlap: options.chunkOverlap ?? 200,
   };
 
-  const result = await indexDocuments(documents, config);
+  const tracer = new TraceEmitter();
+  tracer.onEvent(createStdoutListener());
+  const result = await indexDocuments(documents, config, tracer);
 
   console.log(chalk.bold("\n--- Index Results ---\n"));
   console.log(`  Documents: ${result.documentsProcessed}`);
@@ -89,7 +92,9 @@ export async function ragSearchCommand(
     scoreThreshold: options.threshold,
   };
 
-  const result = await searchDocuments(query, config);
+  const tracer = new TraceEmitter();
+  tracer.onEvent(createStdoutListener());
+  const result = await searchDocuments(query, config, tracer);
 
   if (result.chunks.length === 0) {
     console.log(chalk.dim("  No results found."));

@@ -5,7 +5,7 @@ import type {
   RetrievalChunk,
 } from "../types/index.js";
 import { runAgent } from "./agent-runner.js";
-import { TraceEmitter } from "../trace/emitter.js";
+import type { TraceEmitter } from "../trace/emitter.js";
 import { randomUUID } from "node:crypto";
 
 /**
@@ -19,7 +19,13 @@ import { randomUUID } from "node:crypto";
  * calls Pinecone MCP tools for upsert/search.
  */
 
-// ─── Document Chunking ──────────────────────────────────
+// ---- constants --------------------------------------------------------
+
+const HEADING_RE = /^## /m;
+const APPROX_CHARS_PER_TOKEN = 4;
+const TOKEN_WARN_THRESHOLD = 8192;
+
+// ---- Document Chunking ------------------------------------------------
 
 export function chunkText(
   text: string,
@@ -27,47 +33,111 @@ export function chunkText(
   overlap = 200,
 ): Array<{ id: string; text: string; index: number }> {
   const chunks: Array<{ id: string; text: string; index: number }> = [];
-  let start = 0;
-  let index = 0;
 
-  while (start < text.length) {
-    // Find a natural break point (paragraph or sentence boundary)
-    let end = Math.min(start + chunkSize, text.length);
-    if (end < text.length) {
-      const paragraphBreak = text.lastIndexOf("\n\n", end);
-      const sentenceBreak = text.lastIndexOf(". ", end);
-      if (paragraphBreak > start + chunkSize * 0.5) {
-        end = paragraphBreak + 2;
-      } else if (sentenceBreak > start + chunkSize * 0.5) {
-        end = sentenceBreak + 2;
+  // Phase 1 -- heading-aware splitting.
+  // If the document contains markdown headings (## ), split on them first
+  // so that each section stays self-contained. Sections that exceed
+  // chunkSize are further split in Phase 2.
+  let rawSections: string[];
+  if (HEADING_RE.test(text)) {
+    rawSections = [];
+    const parts = text.split(/(?=^## )/m);
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (trimmed.length > 0) {
+        rawSections.push(trimmed);
       }
     }
+  } else {
+    rawSections = [text];
+  }
 
-    const chunk = text.slice(start, end).trim();
-    if (chunk.length > 0) {
-      chunks.push({
-        id: `chunk-${index}-${randomUUID().slice(0, 8)}`,
-        text: chunk,
-        index,
-      });
-      index++;
+  // Phase 2 -- sub-split each section into chunks of at most chunkSize,
+  // respecting paragraph / sentence boundaries and applying overlap.
+  let index = 0;
+  for (const section of rawSections) {
+    let start = 0;
+    while (start < section.length) {
+      let end = Math.min(start + chunkSize, section.length);
+      if (end < section.length) {
+        const paragraphBreak = section.lastIndexOf("\n\n", end);
+        const sentenceBreak = section.lastIndexOf(". ", end);
+        if (paragraphBreak > start + chunkSize * 0.5) {
+          end = paragraphBreak + 2;
+        } else if (sentenceBreak > start + chunkSize * 0.5) {
+          end = sentenceBreak + 2;
+        }
+      }
+
+      const chunk = section.slice(start, end).trim();
+      if (chunk.length > 0) {
+        // Warn when a single chunk is very large in estimated tokens
+        const estimatedTokens = Math.ceil(chunk.length / APPROX_CHARS_PER_TOKEN);
+        if (estimatedTokens > TOKEN_WARN_THRESHOLD) {
+          console.warn(
+            `[rag-pipeline] chunk-${index} is ~${estimatedTokens} tokens -- ` +
+            `consider reducing chunkSize (currently ${chunkSize})`,
+          );
+        }
+
+        chunks.push({
+          id: `chunk-${index}-${randomUUID().slice(0, 8)}`,
+          text: chunk,
+          index,
+        });
+        index++;
+      }
+
+      // Guard: ensure start never goes negative from a large overlap value
+      start = Math.max(end - overlap, start + 1);
+      if (start >= section.length) break;
     }
-
-    start = end - overlap;
-    if (start >= text.length) break;
   }
 
   return chunks;
 }
 
-// ─── Index Documents via LLM + Pinecone MCP ─────────────
+// ---- Reranking helpers ------------------------------------------------
+
+/**
+ * Sort results by score descending, then apply a diversity filter:
+ * prefer at most one chunk per source. If fewer than topK results
+ * remain after dedup, backfill with the remaining duplicates in
+ * score order.
+ */
+function rerankAndDiversify(
+  chunks: RetrievalChunk[],
+  topK: number,
+): RetrievalChunk[] {
+  // Sort descending by score
+  const sorted = [...chunks].sort((a, b) => b.score - a.score);
+
+  const seen = new Set<string>();
+  const primary: RetrievalChunk[] = [];
+  const backfill: RetrievalChunk[] = [];
+
+  for (const chunk of sorted) {
+    const key = chunk.source ?? chunk.chunkId;
+    if (!seen.has(key)) {
+      seen.add(key);
+      primary.push(chunk);
+    } else {
+      backfill.push(chunk);
+    }
+  }
+
+  const result = [...primary, ...backfill];
+  return result.slice(0, topK);
+}
+
+// ---- Index Documents via LLM + Pinecone MCP ---------------------------
 
 export async function indexDocuments(
   documents: Array<{ id: string; text: string; source: string }>,
   config: RAGConfig,
+  tracer: TraceEmitter,
 ): Promise<RAGIndexResult> {
   const startTime = Date.now();
-  const tracer = new TraceEmitter();
   let totalChunks = 0;
   let totalUpserted = 0;
 
@@ -95,9 +165,16 @@ export async function indexDocuments(
       "Call the upsert-records tool with these records. Each record has id, text, source, documentId, chunkIndex fields.",
     ].join("\n");
 
+    const stepId = `rag-index-${doc.id}`;
+
     try {
+      tracer.toolCall(stepId, {
+        toolName: "pinecone:upsert-records",
+        toolInput: { indexName: config.indexName, recordCount: records.length },
+      });
+
       await runAgent({
-        stepId: `rag-index-${doc.id}`,
+        stepId,
         context: {
           state: "retrieve",
           identity: {
@@ -110,8 +187,11 @@ export async function indexDocuments(
         tracer,
       });
       totalUpserted += chunks.length;
-    } catch {
-      // Partial indexing is acceptable -- log and continue
+    } catch (err: unknown) {
+      // Partial indexing is acceptable -- log to tracer and continue
+      const message =
+        err instanceof Error ? err.message : String(err);
+      tracer.error(stepId, `indexDocuments failed for doc ${doc.id}: ${message}`);
     }
   }
 
@@ -124,14 +204,15 @@ export async function indexDocuments(
   };
 }
 
-// ─── Search via LLM + Pinecone MCP ─────────────────────
+// ---- Search via LLM + Pinecone MCP ------------------------------------
 
 export async function searchDocuments(
   query: string,
   config: RAGConfig,
+  tracer: TraceEmitter,
 ): Promise<RAGSearchResult> {
   const startTime = Date.now();
-  const tracer = new TraceEmitter();
+  const stepId = "rag-search";
 
   const prompt = [
     `Search Pinecone index "${config.indexName}"`,
@@ -143,8 +224,13 @@ export async function searchDocuments(
     "Return the results as JSON array with fields: id, text, score, source.",
   ].join("\n");
 
+  tracer.toolCall(stepId, {
+    toolName: "pinecone:search-records",
+    toolInput: { indexName: config.indexName, query, topK: config.topK },
+  });
+
   const result = await runAgent({
-    stepId: "rag-search",
+    stepId,
     context: {
       state: "retrieve",
       identity: {
@@ -160,7 +246,10 @@ export async function searchDocuments(
   // Parse chunks from LLM output
   let chunks: RetrievalChunk[] = [];
   try {
-    const stripped = result.text.replace(/```(?:json)?\s*\n?/g, "").replace(/```/g, "").trim();
+    const stripped = result.text
+      .replace(/```(?:json)?\s*\n?/g, "")
+      .replace(/```/g, "")
+      .trim();
     const parsed = JSON.parse(stripped);
     chunks = (Array.isArray(parsed) ? parsed : []).map((r: any) => ({
       chunkId: r.id ?? randomUUID().slice(0, 8),
@@ -168,14 +257,30 @@ export async function searchDocuments(
       score: r.score ?? 0,
       text: r.text,
     }));
-  } catch {
-    // LLM output wasn't parseable JSON -- return empty
+  } catch (err: unknown) {
+    // LLM output was not parseable JSON -- log to tracer, return empty
+    const message = err instanceof Error ? err.message : String(err);
+    tracer.error(stepId, `Failed to parse search results: ${message}`);
   }
 
   // Filter by score threshold
   if (config.scoreThreshold) {
     chunks = chunks.filter((c) => c.score >= (config.scoreThreshold ?? 0));
   }
+
+  // Rerank: sort by score descending + diversity filter
+  chunks = rerankAndDiversify(chunks, config.topK);
+
+  // Emit retrieval trace for observability
+  tracer.retrieval(
+    stepId,
+    chunks.map((c) => ({
+      chunkId: c.chunkId,
+      source: c.source,
+      score: c.score,
+      text: c.text,
+    })),
+  );
 
   return {
     query,

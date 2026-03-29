@@ -97,7 +97,11 @@ export async function runAgent(
       };
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
+      const statusCode = (lastError as any)?.status ?? (lastError as any)?.statusCode;
       const isTransient =
+        statusCode === 429 ||
+        statusCode === 529 ||
+        statusCode === 503 ||
         lastError.message.includes("rate_limit") ||
         lastError.message.includes("overloaded") ||
         lastError.message.includes("ECONNREFUSED") ||
@@ -107,7 +111,9 @@ export async function runAgent(
 
       if (!isTransient || attempt === maxRetries - 1) throw lastError;
 
-      const delay = Math.min(1000 * 2 ** attempt, 30000);
+      // Exponential backoff with jitter to avoid thundering herd
+      const baseDelay = Math.min(1000 * 2 ** attempt, 30000);
+      const delay = Math.round(baseDelay * (0.5 + Math.random() * 0.5));
       tracer.emit(stepId, "error", {
         error: `Transient error, retry ${attempt + 1}/${maxRetries} in ${delay}ms: ${lastError.message}`,
       });
@@ -126,17 +132,22 @@ export async function runEvaluation(options: {
   output: string;
   evalType: "groundedness" | "relevance" | "custom";
   rubric?: string;
+  sourceContext?: string;
   model: string;
   tracer: TraceEmitter;
 }): Promise<{ score: number; reasoning: string }> {
-  const { stepId, output, evalType, rubric, model, tracer } = options;
+  const { stepId, output, evalType, rubric, sourceContext, model, tracer } = options;
+
+  const sourceBlock = sourceContext
+    ? `\n\nSource/Evidence:\n${sourceContext}\n`
+    : "\n\n(No source context provided -- evaluate internal coherence only)\n";
 
   const evalPrompts: Record<string, string> = {
     groundedness: `Evaluate the groundedness of the following text.
 Check if all claims are supported by the provided evidence.
 Score: 0.0 = no grounding, 1.0 = fully grounded.
-
-Text:
+${sourceBlock}
+Text to evaluate:
 ${output}
 
 Respond ONLY with this JSON: {"score": 0.0-1.0, "reasoning": "..."}`,
@@ -154,37 +165,71 @@ Respond ONLY with this JSON: {"score": 0.0-1.0, "reasoning": "..."}`,
       : `Evaluate the quality of this text.\n\nText:\n${output}\n\nRespond ONLY with this JSON: {"score": 0.0-1.0, "reasoning": "..."}`,
   };
 
-  const adapter = getAdapter();
-  const result = await adapter.generate({
-    model,
-    systemPrompt: "You are an evaluation judge. Respond only with the requested JSON format.",
-    prompt: evalPrompts[evalType],
-  });
+  // Retry evaluation up to 2 times on transient errors
+  const maxEvalRetries = 2;
+  let lastEvalError: Error | null = null;
 
-  tracer.llmCall(stepId, {
-    model: result.model,
-    inputTokens: result.inputTokens,
-    outputTokens: result.outputTokens,
-    latencyMs: result.latencyMs,
-  });
+  for (let evalAttempt = 0; evalAttempt <= maxEvalRetries; evalAttempt++) {
+    try {
+      const adapter = getAdapter();
+      const result = await adapter.generate({
+        model,
+        systemPrompt: "You are an evaluation judge. Respond only with the requested JSON format.",
+        prompt: evalPrompts[evalType],
+      });
 
-  try {
-    // Try to extract JSON from response
-    const jsonMatch = result.text.match(/\{[\s\S]*"score"[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
+      tracer.llmCall(`${stepId}/eval`, {
+        model: result.model,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+        latencyMs: result.latencyMs,
+      });
+
+      // Parse JSON response
+      try {
+        const jsonMatch = result.text.match(/\{[\s\S]*"score"[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (typeof parsed.score === "number") {
+            return {
+              score: parsed.score,
+              reasoning: parsed.reasoning ?? "",
+            };
+          }
+        }
+      } catch {
+        // JSON parse failed -- try stricter fallback below
+      }
+
+      // Stricter fallback: only accept a number that looks like a score (0-1 or 0-10 range)
+      const scoreMatch = result.text.match(/\b((?:0|1)(?:\.\d+)?|[0-9](?:\.\d+)?|10(?:\.0+)?)\b/);
+      if (scoreMatch) {
+        const parsed = parseFloat(scoreMatch[1]);
+        // Reject clearly non-score numbers (e.g., years, counts)
+        if (parsed <= 10) {
+          return { score: parsed, reasoning: result.text };
+        }
+      }
+
+      // No valid score found -- return 0 with explanation
       return {
-        score: typeof parsed.score === "number" ? parsed.score : 0,
-        reasoning: parsed.reasoning ?? "",
+        score: 0,
+        reasoning: `[eval-parse-failed] Could not extract valid score from: ${result.text.slice(0, 200)}`,
       };
+
+    } catch (err) {
+      lastEvalError = err instanceof Error ? err : new Error(String(err));
+      if (evalAttempt < maxEvalRetries) {
+        const delay = Math.round(1000 * (evalAttempt + 1) * (0.5 + Math.random() * 0.5));
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
     }
-  } catch {
-    // fallback
   }
 
-  const scoreMatch = result.text.match(/(\d+\.?\d*)/);
+  // All eval retries failed -- return 0 so evaluation infrastructure failure doesn't masquerade as content failure
   return {
-    score: scoreMatch ? parseFloat(scoreMatch[1]) : 0,
-    reasoning: result.text,
+    score: 0,
+    reasoning: `[eval-error] Evaluation failed after ${maxEvalRetries + 1} attempts: ${lastEvalError?.message ?? "unknown"}`,
   };
 }

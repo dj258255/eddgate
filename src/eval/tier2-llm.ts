@@ -9,6 +9,11 @@ import type { EvaluationResult, LLMEvaluation } from "../types/index.js";
  * Runs at key transition points only.
  * Uses Claude Agent SDK for evaluation (Max subscription).
  * Score normalized to 0-1 range.
+ *
+ * Key difference from direct runEvaluation:
+ * - Passes sourceContext for groundedness eval
+ * - Normalizes score from arbitrary LLM scales
+ * - Returns structured EvaluationResult with pass/fail
  */
 export async function runTier2Evaluation(options: {
   stepId: string;
@@ -16,9 +21,10 @@ export async function runTier2Evaluation(options: {
   evalConfig: LLMEvaluation;
   defaultModel: string;
   stepModel?: string;
+  sourceContext?: string;
   tracer: TraceEmitter;
 }): Promise<EvaluationResult> {
-  const { stepId, output, evalConfig, defaultModel, stepModel, tracer } = options;
+  const { stepId, output, evalConfig, defaultModel, stepModel, sourceContext, tracer } = options;
   const evalModel = evalConfig.model ?? stepModel ?? defaultModel;
 
   const result = await runEvaluation({
@@ -26,6 +32,7 @@ export async function runTier2Evaluation(options: {
     output,
     evalType: evalConfig.type,
     rubric: evalConfig.rubric,
+    sourceContext: sourceContext ?? evalConfig.sourceContext,
     model: evalModel,
     tracer,
   });
@@ -39,4 +46,3 @@ export async function runTier2Evaluation(options: {
     reasoning: result.reasoning,
   };
 }
-

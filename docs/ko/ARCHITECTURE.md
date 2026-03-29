@@ -69,7 +69,7 @@ Three things combined that don't exist together anywhere else:
 ```typescript
 // 실행 컨텍스트 최소 구조 — 이것만 강제
 interface ExecutionContext {
-  state: "classify" | "retrieve" | "generate" | "validate" | "review";
+  state: "classify" | "retrieve" | "generate" | "validate" | "transform" | "human_approval" | "record_decision";
   identity: {
     role: string;        // "link_researcher" | "content_consolidator" | ...
     model: string;       // "sonnet"
@@ -93,6 +93,9 @@ interface ExecutionContext {
 - [done] 실행 컨텍스트를 코드로 고정 (재현 가능)
 - [done] 각 단계에 필요한 최소 정보만 전달
 - [done] 이전 단계 결과는 필요할 때만 명시적으로 주입
+- [done] State transition validation -- 의심스러운 상태 전환 시 경고 (예: classify -> validate 직행)
+- [done] Safe JSON truncation -- 잘린 JSON이 malformed 출력을 만들지 않도록 보장
+- [done] MCP tool name validation -- mcp:server:tool 형식 검증 (잘못된 도구명 사전 차단)
 
 ---
 
@@ -144,7 +147,7 @@ interface StepDefinition {
 }
 
 interface ValidationRule {
-  type: "schema" | "required_fields" | "format" | "length" | "regex" | "custom";
+  type: "schema" | "required_fields" | "format" | "length" | "regex" | "range" | "enum" | "not_empty" | "custom";
   spec: Record<string, unknown>;
   message: string;           // 실패 시 메시지
 }
@@ -366,7 +369,7 @@ interface AgentRole {
 
 ```
 Tier 1: 규칙 기반 검증 (매 단계, 비용 0, 5-10ms)
-  → 스키마 체크, 필수 필드, 포맷, regex, 길이
+  → 스키마 체크, 필수 필드, 포맷, regex, 길이, range, enum, not_empty
   → 100% 결정적. 오탐 0%.
 
 Tier 2: LLM 평가 (핵심 전환점만, 1-5초, 선택적)
@@ -383,7 +386,7 @@ Tier 3: 사후 오프라인 분석 (비동기, 제한 없음)
 ```typescript
 // Tier 1: 규칙 기반 (동기, 매 단계)
 interface RuleValidation {
-  type: "schema" | "required_fields" | "format" | "regex" | "length";
+  type: "schema" | "required_fields" | "format" | "regex" | "length" | "range" | "enum" | "not_empty";
   spec: Record<string, unknown>;
   // 실패 시: 즉시 차단. 다음 단계 전달 금지.
 }
@@ -490,6 +493,8 @@ interface ModelConfig {
 interface TraceEvent {
   timestamp: string;           // ISO 8601
   traceId: string;             // 전체 실행 추적 ID
+  spanId: string;              // 현재 span ID
+  parentSpanId?: string;       // 부모 span ID (span hierarchy 지원)
   stepId: string;              // 현재 단계 ID
   type: "step_start" | "step_end" | "llm_call" | "tool_call" | "validation" | "evaluation" | "error";
   // 실행 컨텍스트 스냅샷 (재현용)
@@ -512,6 +517,11 @@ interface TraceOutput {
   type: "stdout" | "jsonl_file" | "langfuse" | "otel" | "custom";
   config?: Record<string, unknown>;
 }
+
+// TraceEmitter API
+// emitter.toolCall(stepId, toolName, input, output) -- tool 호출 기록 (span hierarchy 자동)
+// emitter.flush() -- 버퍼에 쌓인 이벤트를 출력 대상으로 강제 전송
+// MAX_BUFFER_SIZE = 10,000 -- 버퍼 초과 시 자동 flush
 ```
 
 **로깅 전략**:
@@ -546,7 +556,10 @@ project/
 ├── workflows/
 │   ├── document-pipeline.yaml  # 6단계 문서 파이프라인
 │   ├── code-review.yaml        # 코드 리뷰 워크플로우
-│   └── bug-fix.yaml            # 버그 수정 워크플로우
+│   ├── bug-fix.yaml            # 버그 수정 워크플로우
+│   ├── api-design.yaml         # API 설계 워크플로우
+│   ├── translation.yaml        # 번역 워크플로우
+│   └── rag-pipeline.yaml       # RAG 인덱싱 파이프라인 (Pinecone MCP)
 ├── roles/
 │   ├── backend_dev.yaml
 │   ├── qa_engineer.yaml
@@ -847,7 +860,7 @@ eddgate/
 11. [done] human_approval 단계 타입
 12. [done] 워크플로우 템플릿 3종 (document-pipeline, code-review, bug-fix)
 13. [done] 역할 프롬프트 8개
-14. [done] 유닛 테스트 41개 통과
+14. [done] 유닛 테스트 219개 통과
 15. [done] 8단계 파이프라인 실행 성공 (627s, 37K tokens, Max 구독)
 16. [done] npm 패키지 준비
 
@@ -857,7 +870,7 @@ eddgate/
 18. [done] Tier 3 오프라인 평가 + 회귀 감지
 19. [done] diff-eval (프롬프트 변경 전후 비교)
 20. [done] MCP 서버 관리 (mcp list/add/remove)
-21. [done] 추가 워크플로우 템플릿 (api-design, translation)
+21. [done] 추가 워크플로우 템플릿 (api-design, translation, rag-pipeline)
 22. [done] GitHub Actions CI/CD (ci.yml, eval.yml)
 23. [done] 워크플로우 시각화 (Mermaid/ASCII)
 
@@ -871,13 +884,13 @@ eddgate/
 29. [done] E2E Trace에 retrieval chunk ID/source 추적
 30. [done] Context Engineering 강제: retrieve 단계 실행 컨텍스트 분리 (코드 강제)
 31. [done] gate-rules.yaml 템플릿
+32. [done] RAG 인덱싱 파이프라인 (Pinecone MCP 통합, rag-pipeline 워크플로우)
+33. [done] A/B 프롬프트 테스트 (Welch's t-test 기반 통계 검정, ABABAB 인터리빙)
 
 **미래 (선택)**:
 
 - Claude Code 플러그인 래퍼
 - 웹 대시보드
-- RAG 인덱싱 파이프라인 (Pinecone MCP 통합)
-- A/B 프롬프트 배포
 
 ---
 

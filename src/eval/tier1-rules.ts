@@ -36,6 +36,12 @@ function runRule(output: unknown, rule: ValidationRule): boolean {
       return checkLength(output, rule.spec);
     case "regex":
       return checkRegex(output, rule.spec);
+    case "range":
+      return checkRange(output, rule.spec);
+    case "enum":
+      return checkEnum(output, rule.spec);
+    case "not_empty":
+      return checkNotEmpty(output, rule.spec);
     case "custom":
       return checkCustom(output, rule.spec);
     default:
@@ -59,6 +65,9 @@ function checkRequiredFields(
   });
 }
 
+// Reserved keys in schema spec that are not field names
+const SCHEMA_META_KEYS = new Set(["minItems", "maxItems", "minLength", "maxLength"]);
+
 function checkSchema(
   output: unknown,
   spec: Record<string, unknown>,
@@ -66,19 +75,27 @@ function checkSchema(
   if (typeof output !== "object" || output === null) return false;
   const obj = output as Record<string, unknown>;
 
+  const minItems = spec.minItems as number | undefined;
+  const maxItems = spec.maxItems as number | undefined;
+
   for (const [key, expectedType] of Object.entries(spec)) {
+    // Skip metadata keys -- they are constraints, not field definitions
+    if (SCHEMA_META_KEYS.has(key)) continue;
+
     const value = obj[key];
 
     if (expectedType === "array") {
       if (!Array.isArray(value)) return false;
-      const minItems = spec.minItems as number | undefined;
       if (minItems !== undefined && value.length < minItems) return false;
+      if (maxItems !== undefined && value.length > maxItems) return false;
     } else if (expectedType === "string") {
       if (typeof value !== "string") return false;
     } else if (expectedType === "number") {
       if (typeof value !== "number") return false;
     } else if (expectedType === "object") {
       if (typeof value !== "object" || value === null) return false;
+    } else if (expectedType === "boolean") {
+      if (typeof value !== "boolean") return false;
     }
   }
 
@@ -103,7 +120,8 @@ function checkFormat(
         return false;
       }
     case "markdown":
-      return value.includes("#") || value.includes("-");
+      // Real markdown detection: heading, list, or emphasis patterns
+      return /^#{1,6}\s+.+/m.test(value) || /^\s*[-*+]\s+.+/m.test(value) || /\*\*.+\*\*/.test(value) || /\[.+\]\(.+\)/.test(value);
     case "url":
       return /^https?:\/\//.test(value);
     default:
@@ -161,7 +179,8 @@ function checkCustom(
     case "no_empty_sections":
       return checkNoEmptySections(output);
     default:
-      return true;
+      // Unknown custom check name -- fail explicitly instead of silently passing
+      return false;
   }
 }
 
@@ -195,6 +214,61 @@ function checkNoEmptySections(output: unknown): boolean {
   const text = String(output);
   const sections = text.split(/^#{1,3}\s+/m).filter(Boolean);
   return sections.every((s) => s.trim().length > 10);
+}
+
+// ─── Range / Enum / Not-Empty ─────────────────────────────────
+
+function checkRange(
+  output: unknown,
+  spec: Record<string, unknown>,
+): boolean {
+  const field = spec.field as string | undefined;
+  const min = spec.min as number | undefined;
+  const max = spec.max as number | undefined;
+
+  let value: unknown = output;
+  if (field && typeof output === "object" && output !== null) {
+    value = (output as Record<string, unknown>)[field];
+  }
+
+  if (typeof value !== "number") return false;
+  if (min !== undefined && value < min) return false;
+  if (max !== undefined && value > max) return false;
+  return true;
+}
+
+function checkEnum(
+  output: unknown,
+  spec: Record<string, unknown>,
+): boolean {
+  const field = spec.field as string | undefined;
+  const allowed = spec.values as unknown[] | undefined;
+  if (!allowed || !Array.isArray(allowed)) return true;
+
+  let value: unknown = output;
+  if (field && typeof output === "object" && output !== null) {
+    value = (output as Record<string, unknown>)[field];
+  }
+
+  return allowed.includes(value);
+}
+
+function checkNotEmpty(
+  output: unknown,
+  spec: Record<string, unknown>,
+): boolean {
+  const field = spec.field as string | undefined;
+
+  let value: unknown = output;
+  if (field && typeof output === "object" && output !== null) {
+    value = (output as Record<string, unknown>)[field];
+  }
+
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") return Object.keys(value).length > 0;
+  return true;
 }
 
 // ─── Utility ─────────────────────────────────────────────────

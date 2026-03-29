@@ -1,16 +1,20 @@
-import { normalizeScore } from "../eval/normalize-score.js";
 import { createInterface } from "node:readline";
+import pLimit from "p-limit";
 import type {
   WorkflowDefinition,
   StepDefinition,
   StepResult,
   WorkflowResult,
-  EvaluationResult,
 } from "../types/index.js";
+import type { EvaluationResult } from "../types/index.js";
 import { buildContext } from "./context-builder.js";
-import { runAgent, runEvaluation } from "./agent-runner.js";
+import { runAgent } from "./agent-runner.js";
 import { validateOutput } from "../eval/tier1-rules.js";
+import { runTier2Evaluation } from "../eval/tier2-llm.js";
 import { TraceEmitter } from "../trace/emitter.js";
+
+// Concurrency cap for parallel layer execution (prevents rate limiting)
+const DEFAULT_CONCURRENCY = 5;
 
 /**
  * Workflow Engine
@@ -55,8 +59,10 @@ export async function executeWorkflow(
     // parallel: run independent steps concurrently
     const layers = buildParallelLayers(orderedSteps);
 
+    const limit = pLimit(DEFAULT_CONCURRENCY);
+
     for (const layer of layers) {
-      const layerPromises = layer.map(async (step) => {
+      const layerPromises = layer.map((step) => limit(async () => {
         if (hasDependencyFailure(step, results)) {
           return createSkippedResult(step.id);
         }
@@ -68,14 +74,27 @@ export async function executeWorkflow(
           rolePrompts?.get(step.context.identity.role),
           tracer,
           modelOverrides,
+          false,
+          orderedSteps,
         );
-      });
+      }));
 
       const layerResults = await Promise.all(layerPromises);
 
       for (let i = 0; i < layer.length; i++) {
         results.set(layer[i].id, layerResults[i]);
         stepResults.push(layerResults[i]);
+
+        // Budget tracking (parallel)
+        accumulatedCost += estimateCostFromTokens(
+          layerResults[i].tokenUsage.input,
+          layerResults[i].tokenUsage.output,
+        );
+        if (maxBudgetUsd && accumulatedCost > maxBudgetUsd) {
+          tracer.error(layer[i].id, `Budget exceeded: $${accumulatedCost.toFixed(4)} > $${maxBudgetUsd}`);
+          tracer.workflowEnd("failed", Math.round(performance.now() - workflowStart));
+          return buildWorkflowResult(workflow.name, tracer.getTraceId(), "failed", stepResults, workflowStart);
+        }
 
         if (
           layerResults[i].status === "failed" &&
@@ -114,6 +133,8 @@ export async function executeWorkflow(
         rolePrompts?.get(step.context.identity.role),
         tracer,
         modelOverrides,
+        false,
+        orderedSteps,
       );
 
       results.set(step.id, stepResult);
@@ -131,7 +152,25 @@ export async function executeWorkflow(
       }
 
       if (stepResult.status === "failed") {
-        if (workflow.config.onValidationFail === "block") {
+        if (workflow.config.onValidationFail === "retry") {
+          // Workflow-level retry: re-execute the failed step up to 2 times
+          let retried = false;
+          for (let retryAttempt = 0; retryAttempt < 2; retryAttempt++) {
+            tracer.emit(step.id, "step_start", { output: `workflow-retry ${retryAttempt + 1}/2` });
+            const retryResult = await executeStep(
+              step, input, results, workflow.config.defaultModel,
+              rolePrompts?.get(step.context.identity.role), tracer, modelOverrides, true, orderedSteps,
+            );
+            results.set(step.id, retryResult);
+            stepResults[stepResults.length - 1] = retryResult;
+            accumulatedCost += estimateCostFromTokens(retryResult.tokenUsage.input, retryResult.tokenUsage.output);
+            if (retryResult.status !== "failed") { retried = true; break; }
+          }
+          if (!retried) {
+            tracer.workflowEnd("failed", Math.round(performance.now() - workflowStart));
+            return buildWorkflowResult(workflow.name, tracer.getTraceId(), "failed", stepResults, workflowStart);
+          }
+        } else if (workflow.config.onValidationFail === "block") {
           tracer.workflowEnd(
             "failed",
             Math.round(performance.now() - workflowStart),
@@ -144,6 +183,7 @@ export async function executeWorkflow(
             workflowStart,
           );
         }
+        // "flag" -> continue execution
       }
     }
   }
@@ -174,9 +214,10 @@ async function executeStep(
   tracer: TraceEmitter,
   modelOverrides?: { classify?: string; generate?: string; validate?: string },
   _isRetry = false, // true = inside retryStep, skip nested retries
+  allSteps?: StepDefinition[],
 ): Promise<StepResult> {
   const stepStart = performance.now();
-  const context = buildContext(step, previousResults, defaultModel, modelOverrides);
+  const context = buildContext(step, previousResults, defaultModel, modelOverrides, allSteps);
   const trace: StepResult["trace"] = [];
 
   tracer.stepStart(step.id, context);
@@ -376,6 +417,7 @@ async function executeStep(
       stepId: step.id,
       status: "failed",
       output: null,
+      error: errorMsg,
       trace,
       durationMs,
       tokenUsage: { input: 0, output: 0 },
@@ -392,27 +434,14 @@ async function runLLMEvaluation(
   tracer: TraceEmitter,
 ): Promise<EvaluationResult> {
   const evalConfig = step.evaluation!;
-  const evalModel =
-    evalConfig.model ?? step.model ?? defaultModel;
-
-  const result = await runEvaluation({
+  return runTier2Evaluation({
     stepId: step.id,
     output,
-    evalType: evalConfig.type,
-    rubric: evalConfig.rubric,
-    model: evalModel,
+    evalConfig,
+    defaultModel,
+    stepModel: step.model,
     tracer,
   });
-
-  // score를 0~1 범위로 정규화 (LLM이 가끔 0~10이나 0~100으로 줌)
-  const normalizedScore = normalizeScore(result.score);
-
-  return {
-    score: normalizedScore,
-    passed: normalizedScore >= evalConfig.threshold,
-    action: evalConfig.onFail,
-    reasoning: result.reasoning,
-  };
 }
 
 // ─── Retry Logic ─────────────────────────────────────────────
@@ -440,6 +469,7 @@ async function retryStep(
       tracer,
       undefined, // modelOverrides
       true, // _isRetry = true -- no nested retries
+      undefined, // allSteps -- not available in retry context
     );
 
     if (result.status === "success" || result.status === "flagged") {
@@ -457,20 +487,22 @@ function getStepInput(
   originalInput: string,
   previousResults: Map<string, StepResult>,
 ): string {
-  // 첫 단계거나 의존성 없으면 원본 입력
   if (!step.dependsOn?.length) return originalInput;
 
-  // 마지막 의존성의 출력을 기본 입력으로
-  const lastDep = step.dependsOn[step.dependsOn.length - 1];
-  const lastResult = previousResults.get(lastDep);
-
-  if (lastResult?.status === "success" && lastResult.output) {
-    const outputStr =
-      typeof lastResult.output === "string"
-        ? lastResult.output
-        : JSON.stringify(lastResult.output, null, 2);
-    return outputStr;
+  // Merge all dependency outputs (fan-in support)
+  const depOutputs: string[] = [];
+  for (const depId of step.dependsOn) {
+    const result = previousResults.get(depId);
+    if (result?.status === "success" && result.output) {
+      const outputStr =
+        typeof result.output === "string"
+          ? result.output
+          : JSON.stringify(result.output, null, 2);
+      depOutputs.push(`## Output from [${depId}]\n${outputStr}`);
+    }
   }
+
+  if (depOutputs.length > 0) return depOutputs.join("\n\n---\n\n");
 
   return originalInput;
 }
@@ -500,17 +532,24 @@ function createSkippedResult(stepId: string): StepResult {
 function topologicalSort(steps: StepDefinition[]): StepDefinition[] {
   const sorted: StepDefinition[] = [];
   const visited = new Set<string>();
+  const inProgress = new Set<string>();
   const stepMap = new Map(steps.map((s) => [s.id, s]));
 
   function visit(step: StepDefinition) {
     if (visited.has(step.id)) return;
-    visited.add(step.id);
+    if (inProgress.has(step.id)) {
+      throw new Error(`Cycle detected in workflow: step "${step.id}" has circular dependency`);
+    }
+
+    inProgress.add(step.id);
 
     for (const depId of step.dependsOn ?? []) {
       const dep = stepMap.get(depId);
       if (dep) visit(dep);
     }
 
+    inProgress.delete(step.id);
+    visited.add(step.id);
     sorted.push(step);
   }
 
@@ -594,7 +633,10 @@ function buildParallelLayers(
       }
     }
 
-    if (layer.length === 0) break; // 순환 의존성 방지
+    if (layer.length === 0) {
+      const unassigned = steps.filter((s) => !assigned.has(s.id)).map((s) => s.id);
+      throw new Error(`Cycle detected in parallel layers: unresolvable steps [${unassigned.join(", ")}]`);
+    }
 
     for (const step of layer) {
       assigned.add(step.id);

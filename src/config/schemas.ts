@@ -39,6 +39,9 @@ const validationRuleSchema = z.object({
     "format",
     "length",
     "regex",
+    "range",
+    "enum",
+    "not_empty",
     "custom",
   ]),
   spec: z.record(z.string(), z.unknown()),
@@ -55,6 +58,7 @@ const llmEvaluationSchema = z.object({
   maxRetries: z.number().int().min(1).max(5).default(2),
   model: z.string().optional(),
   rubric: z.string().optional(),
+  sourceContext: z.string().optional(),
 });
 
 // ─── Step Definition ─────────────────────────────────────────

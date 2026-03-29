@@ -37,6 +37,9 @@ export type ValidationRuleType =
   | "format"
   | "length"
   | "regex"
+  | "range"
+  | "enum"
+  | "not_empty"
   | "custom";
 
 export interface ValidationRule {
@@ -66,6 +69,7 @@ export interface LLMEvaluation {
   maxRetries?: number;
   model?: string;
   rubric?: string;
+  sourceContext?: string;
 }
 
 export interface EvaluationResult {
@@ -162,6 +166,7 @@ export interface TraceEvent {
   timestamp: string;
   traceId: string;
   stepId: string;
+  parentSpanId?: string;
   type: TraceEventType;
   context?: ExecutionContext;
   data: {
@@ -176,6 +181,9 @@ export interface TraceEvent {
     decision?: { status: string; reason: string; outputPath?: string };
     output?: string;
     error?: string;
+    toolName?: string;
+    toolInput?: unknown;
+    toolOutput?: unknown;
   };
 }
 
@@ -192,6 +200,7 @@ export interface StepResult {
   stepId: string;
   status: "success" | "failed" | "flagged" | "skipped";
   output: unknown;
+  error?: string;
   validation?: ValidationResult;
   evaluation?: EvaluationResult;
   trace: TraceEvent[];
@@ -300,4 +309,7 @@ export interface ABComparison {
   scoreDelta: number;
   costDelta: number;
   tokenDelta: number;
+  pValue?: number;
+  confidenceInterval?: [number, number];
+  statisticallySignificant?: boolean;
 }

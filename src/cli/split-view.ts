@@ -37,11 +37,11 @@ export function showSplitView(options: SplitViewOptions): Promise<void> {
       width: "100%",
       height: 1,
       tags: true,
-      style: { bg: "black" },
-      content: ` {yellow-fg}<|>{/yellow-fg} {bold}eddgate{/bold}  {gray-fg}${options.title}{/gray-fg}`,
+      style: { bg: "#0a0e14", fg: "#7ec8e3" },
+      content: ` {#fbbf24-fg}\u25C6{/#fbbf24-fg} {bold}eddgate{/bold}  {#546478-fg}${options.title}{/#546478-fg}`,
     });
 
-    // Left panel
+    // Left panel (baseline / before)
     const leftBox = blessed.box({
       parent: screen,
       label: ` {bold}${options.leftLabel}{/bold} `,
@@ -52,12 +52,12 @@ export function showSplitView(options: SplitViewOptions): Promise<void> {
       height: "100%-2",
       border: { type: "line" },
       style: {
-        border: { fg: "red" },
-        label: { fg: "red" },
+        border: { fg: "#f87171" },
+        label: { fg: "#f87171" },
       },
       scrollable: true,
       alwaysScroll: true,
-      scrollbar: { style: { bg: "red" } },
+      scrollbar: { style: { bg: "#3d5066" } },
       keys: true,
       vi: true,
       mouse: true,
@@ -65,7 +65,7 @@ export function showSplitView(options: SplitViewOptions): Promise<void> {
       content: options.leftContent,
     });
 
-    // Right panel
+    // Right panel (current / after)
     const rightBox = blessed.box({
       parent: screen,
       label: ` {bold}${options.rightLabel}{/bold} `,
@@ -76,12 +76,12 @@ export function showSplitView(options: SplitViewOptions): Promise<void> {
       height: "100%-2",
       border: { type: "line" },
       style: {
-        border: { fg: "green" },
-        label: { fg: "green" },
+        border: { fg: "#4ade80" },
+        label: { fg: "#4ade80" },
       },
       scrollable: true,
       alwaysScroll: true,
-      scrollbar: { style: { bg: "green" } },
+      scrollbar: { style: { bg: "#3d5066" } },
       keys: true,
       vi: true,
       mouse: true,
@@ -97,8 +97,8 @@ export function showSplitView(options: SplitViewOptions): Promise<void> {
       width: "100%",
       height: 1,
       tags: true,
-      style: { bg: "black" },
-      content: ` {cyan-fg}Tab{/cyan-fg} switch panel  {cyan-fg}↑↓{/cyan-fg} scroll  {cyan-fg}q{/cyan-fg} close  ${options.statusHint ?? ""}`,
+      style: { bg: "#0a0e14", fg: "#546478" },
+      content: ` {#7ec8e3-fg}Tab{/#7ec8e3-fg} switch panel  {#7ec8e3-fg}\u2191\u2193{/#7ec8e3-fg} scroll  {#7ec8e3-fg}q{/#7ec8e3-fg} close  ${options.statusHint ?? ""}`,
     });
 
     // Focus management
@@ -109,12 +109,12 @@ export function showSplitView(options: SplitViewOptions): Promise<void> {
       focusLeft = !focusLeft;
       if (focusLeft) {
         leftBox.focus();
-        (leftBox as any).style.border.fg = "red";
-        (rightBox as any).style.border.fg = "gray";
+        (leftBox as any).style.border.fg = "#f87171";
+        (rightBox as any).style.border.fg = "#2a3a4a";
       } else {
         rightBox.focus();
-        (rightBox as any).style.border.fg = "gray";
-        (leftBox as any).style.border.fg = "green";
+        (rightBox as any).style.border.fg = "#2a3a4a";
+        (leftBox as any).style.border.fg = "#4ade80";
       }
       screen.render();
     });
@@ -143,13 +143,13 @@ export function showDiffView(diffs: Array<{
   let rightLines = "{bold}Current{/bold}\n\n";
 
   if (diffs.length === 0) {
-    leftLines += "{green-fg}No changes detected.{/green-fg}";
-    rightLines += "{green-fg}No changes detected.{/green-fg}";
+    leftLines += "{#4ade80-fg}\u2713 No changes detected.{/#4ade80-fg}";
+    rightLines += "{#4ade80-fg}\u2713 No changes detected.{/#4ade80-fg}";
   } else {
     for (const d of diffs) {
-      const color = d.severity === "regression" ? "red" : d.severity === "improvement" ? "green" : "yellow";
+      const color = d.severity === "regression" ? "#f87171" : d.severity === "improvement" ? "#4ade80" : "#fbbf24";
 
-      leftLines += `{gray-fg}${d.stepId}.${d.field}{/gray-fg}\n`;
+      leftLines += `{#546478-fg}${d.stepId}.${d.field}{/#546478-fg}\n`;
       leftLines += `  ${d.before}\n\n`;
 
       rightLines += `{${color}-fg}${d.stepId}.${d.field}{/${color}-fg}\n`;
@@ -166,7 +166,7 @@ export function showDiffView(diffs: Array<{
     rightLabel: "After",
     leftContent: leftLines,
     rightContent: rightLines,
-    statusHint: `{red-fg}${regressions} regression(s){/red-fg}  {green-fg}${improvements} improvement(s){/green-fg}`,
+    statusHint: `{#f87171-fg}\u2717 ${regressions} regression(s){/#f87171-fg}  {#4ade80-fg}\u2713 ${improvements} improvement(s){/#4ade80-fg}`,
   });
 }
 
@@ -186,12 +186,12 @@ export function showRulePreview(clusters: Array<{
   let rightLines = "{bold}Generated Rules{/bold}\n\n";
 
   for (const c of clusters) {
-    leftLines += `{red-fg}${c.id}{/red-fg} ${c.description}\n`;
-    leftLines += `  {gray-fg}${c.count} occurrences (${c.percentage.toFixed(0)}%){/gray-fg}\n`;
-    leftLines += `  {cyan-fg}Fix:{/cyan-fg} ${c.fix}\n\n`;
+    leftLines += `{#f87171-fg}\u2022 ${c.id}{/#f87171-fg} ${c.description}\n`;
+    leftLines += `  {#546478-fg}${c.count} occurrences (${c.percentage.toFixed(0)}%){/#546478-fg}\n`;
+    leftLines += `  {#7ec8e3-fg}Fix:{/#7ec8e3-fg} ${c.fix}\n\n`;
 
     if (c.ruleYaml) {
-      rightLines += `{yellow-fg}# ${c.id}{/yellow-fg}\n`;
+      rightLines += `{#fbbf24-fg}# ${c.id}{/#fbbf24-fg}\n`;
       rightLines += `${c.ruleYaml}\n\n`;
     }
   }
@@ -202,6 +202,6 @@ export function showRulePreview(clusters: Array<{
     rightLabel: "Rules (YAML)",
     leftContent: leftLines,
     rightContent: rightLines,
-    statusHint: `{yellow-fg}${clusters.length} pattern(s){/yellow-fg}`,
+    statusHint: `{#fbbf24-fg}\u26A0 ${clusters.length} pattern(s){/#fbbf24-fg}`,
   });
 }

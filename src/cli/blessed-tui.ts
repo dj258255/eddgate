@@ -35,61 +35,70 @@ export async function launchBlessedTUI(): Promise<void> {
     fullUnicode: true,
   });
 
-  // Header
+  // Header -- Liquid Glass: deep background with accent shimmer
   blessed.box({
     parent: screen,
     top: 0, left: 0, width: "100%", height: 1,
     tags: true,
-    style: { bg: "black" },
-    content: " {yellow-fg}<|>{/yellow-fg} {bold}eddgate{/bold}  {gray-fg}Self-improving evaluation loop{/gray-fg}",
+    style: { bg: "#0a0e14", fg: "#7ec8e3" },
+    content: " {bold}\u25C6 eddgate{/bold}  {#546478-fg}Self-improving evaluation loop{/#546478-fg}  {#3d5066-fg}\u2502{/#3d5066-fg}  {#5b8fb9-fg}v0.1.0{/#5b8fb9-fg}",
   });
 
-  // Menu
+  // Menu -- Liquid Glass: subtle border, soft selection highlight
+  const menuIcons = ["\u25B6", "\u2261", "\u2713", "\u2637", "\u2630", "\u2699", "\u272A", "\u2318", "\u2716"];
   menuBox = blessed.list({
     parent: screen,
-    label: ` {bold}Menu{/bold} `,
+    label: ` {#5b8fb9-fg}{bold}Menu{/bold}{/#5b8fb9-fg} `,
     tags: true,
     top: 1, left: 0, width: "25%", height: "100%-2",
     border: { type: "line" },
     style: {
-      border: { fg: "gray" },
-      selected: { bg: "cyan", fg: "black", bold: true },
-      item: { fg: "white" },
+      border: { fg: "#2a3a4a" },
+      bg: "#111820",
+      selected: { bg: "#1a2332", fg: "#a8e0f7", bold: true },
+      item: { fg: "#8b9bb4" },
+      focus: { border: { fg: "#5b8fb9" } },
     },
     keys: true, vi: true, mouse: true,
     items: [
-      `  ${t("menu.run")}`,
-      `  ${t("menu.analyze")}`,
-      `  ${t("menu.test")}`,
-      `  ${t("menu.monitor")}`,
-      `  ${t("menu.traces")}`,
-      `  ${t("menu.mcp")}`,
-      `  Plugins`,
-      `  ${t("menu.config")}`,
-      `  ${t("menu.exit")}`,
+      ` ${menuIcons[0]} ${t("menu.run")}`,
+      ` ${menuIcons[1]} ${t("menu.analyze")}`,
+      ` ${menuIcons[2]} ${t("menu.test")}`,
+      ` ${menuIcons[3]} ${t("menu.monitor")}`,
+      ` ${menuIcons[4]} ${t("menu.traces")}`,
+      ` ${menuIcons[5]} ${t("menu.mcp")}`,
+      ` ${menuIcons[6]} Plugins`,
+      ` ${menuIcons[7]} ${t("menu.config")}`,
+      ` ${menuIcons[8]} ${t("menu.exit")}`,
     ],
     padding: { top: 1 },
   });
 
-  // Content
+  // Content -- Liquid Glass: elevated surface with focus glow
   contentBox = blessed.box({
     parent: screen,
     tags: true,
     top: 1, left: "25%", width: "75%", height: "100%-2",
     border: { type: "line" },
-    style: { border: { fg: "gray" } },
+    style: {
+      border: { fg: "#2a3a4a" },
+      bg: "#0a0e14",
+      fg: "#e8edf3",
+      focus: { border: { fg: "#5b8fb9" } },
+    },
     scrollable: true, alwaysScroll: true,
-    scrollbar: { style: { bg: "cyan" } },
+    scrollbar: { style: { bg: "#3d5066" } },
     keys: true, vi: true, mouse: true,
     padding: { left: 1, right: 1 },
   });
 
-  // Status bar
+  // Status bar -- Liquid Glass: deep bg with muted text, accent keys
   blessed.box({
     parent: screen,
     bottom: 0, left: 0, width: "100%", height: 1,
-    tags: true, style: { bg: "black" },
-    content: " {cyan-fg}↑↓{/cyan-fg} navigate  {cyan-fg}Enter{/cyan-fg} select  {cyan-fg}Tab{/cyan-fg} switch  {cyan-fg}q{/cyan-fg} quit",
+    tags: true,
+    style: { bg: "#0a0e14", fg: "#546478" },
+    content: " {#5b8fb9-fg}\u2191\u2193{/#5b8fb9-fg} navigate  {#5b8fb9-fg}Enter{/#5b8fb9-fg} select  {#5b8fb9-fg}Tab{/#5b8fb9-fg} switch  {#5b8fb9-fg}?{/#5b8fb9-fg} help  {#5b8fb9-fg}q{/#5b8fb9-fg} quit",
   });
 
   // Events
@@ -111,11 +120,263 @@ export async function launchBlessedTUI(): Promise<void> {
     screen.render();
   });
 
+  // Help overlay on ? key
+  screen.key(["?"], () => showHelpOverlay());
+
   menuBox.focus();
   menuBox.select(0);
   await updateContent(0);
   screen.render();
 }
+
+// ─── Help System ──────────────────────────────────────
+
+const HELP_TEXTS: Record<number, { title: string; lines: string[] }> = {
+  0: {
+    title: t("help.run.title"),
+    lines: [
+      `{bold}{#7ec8e3-fg}\u25C6 ${t("help.run.title")}{/#7ec8e3-fg}{/bold}`,
+      "",
+      t("help.run.desc"),
+      "",
+      `{#5b8fb9-fg}${t("help.run.howTitle")}:{/#5b8fb9-fg}`,
+      `  ${t("help.run.how1")}`,
+      `  ${t("help.run.how2")}`,
+      `  ${t("help.run.how3")}`,
+      `  ${t("help.run.how4")}`,
+      "",
+      `{#5b8fb9-fg}${t("help.run.gateTitle")}:{/#5b8fb9-fg}`,
+      `  {#4ade80-fg}${t("help.run.gate1")}{/#4ade80-fg}`,
+      `  {#fbbf24-fg}${t("help.run.gate2")}{/#fbbf24-fg}`,
+      "",
+      `{#5b8fb9-fg}${t("help.run.optTitle")}:{/#5b8fb9-fg}`,
+      `  ${t("help.run.optReport")}`,
+      `  ${t("help.run.optTrace")}`,
+      `  ${t("help.run.optBudget")}`,
+      `  ${t("help.run.optDry")}`,
+      "",
+      `{#5b8fb9-fg}${t("help.run.whenTitle")}:{/#5b8fb9-fg}`,
+      `  \u2022 ${t("help.run.when1")}`,
+      `  \u2022 ${t("help.run.when2")}`,
+      `  \u2022 ${t("help.run.when3")}`,
+      `  \u2022 ${t("help.run.when4")}`,
+    ],
+  },
+  1: {
+    title: t("help.analyze.title"),
+    lines: [
+      `{bold}{#fbbf24-fg}\u25C6 ${t("help.analyze.title")}{/#fbbf24-fg}{/bold}`,
+      "",
+      t("help.analyze.desc"),
+      "",
+      `{#5b8fb9-fg}${t("help.analyze.subTitle")}:{/#5b8fb9-fg}`,
+      `  {#fbbf24-fg}${t("help.analyze.sub1")}{/#fbbf24-fg}`,
+      `  {#fbbf24-fg}${t("help.analyze.sub2")}{/#fbbf24-fg}`,
+      `  {#fbbf24-fg}${t("help.analyze.sub3")}{/#fbbf24-fg}`,
+      `  {#fbbf24-fg}${t("help.analyze.sub4")}{/#fbbf24-fg}`,
+      `  {#fbbf24-fg}${t("help.analyze.sub5")}{/#fbbf24-fg}`,
+      "",
+      `{#546478-fg}${t("help.analyze.loopNote")}{/#546478-fg}`,
+      "",
+      `{#5b8fb9-fg}${t("help.analyze.whenTitle")}:{/#5b8fb9-fg}`,
+      `  \u2022 ${t("help.analyze.when1")}`,
+      `  \u2022 ${t("help.analyze.when2")}`,
+      `  \u2022 ${t("help.analyze.when3")}`,
+      `  \u2022 ${t("help.analyze.when4")}`,
+    ],
+  },
+  2: {
+    title: t("help.test.title"),
+    lines: [
+      `{bold}{#4ade80-fg}\u25C6 ${t("help.test.title")}{/#4ade80-fg}{/bold}`,
+      "",
+      t("help.test.desc"),
+      "",
+      `{#5b8fb9-fg}${t("help.test.subTitle")}:{/#5b8fb9-fg}`,
+      `  {#4ade80-fg}${t("help.test.sub1")}{/#4ade80-fg}`,
+      `  {#4ade80-fg}${t("help.test.sub2")}{/#4ade80-fg}`,
+      `  {#4ade80-fg}${t("help.test.sub3")}{/#4ade80-fg}`,
+      "",
+      `{#5b8fb9-fg}CI/CD:{/#5b8fb9-fg}`,
+      `  ${t("help.test.ciNote")}`,
+      "",
+      `{#5b8fb9-fg}${t("help.test.whenTitle")}:{/#5b8fb9-fg}`,
+      `  \u2022 ${t("help.test.when1")}`,
+      `  \u2022 ${t("help.test.when2")}`,
+      `  \u2022 ${t("help.test.when3")}`,
+      `  \u2022 ${t("help.test.when4")}`,
+    ],
+  },
+  3: {
+    title: t("help.monitor.title"),
+    lines: [
+      `{bold}{#22d3ee-fg}\u25C6 ${t("help.monitor.title")}{/#22d3ee-fg}{/bold}`,
+      "",
+      t("help.monitor.desc"),
+      "",
+      `{#5b8fb9-fg}${t("help.monitor.dashTitle")}:{/#5b8fb9-fg}`,
+      `  {#22d3ee-fg}${t("help.monitor.dash1")}{/#22d3ee-fg}`,
+      `  {#4ade80-fg}${t("help.monitor.dash2")}{/#4ade80-fg}`,
+      `  {#fbbf24-fg}${t("help.monitor.dash3")}{/#fbbf24-fg}`,
+      "",
+      `{#546478-fg}${t("help.monitor.dataNote")}{/#546478-fg}`,
+      "",
+      `{#5b8fb9-fg}${t("help.monitor.whenTitle")}:{/#5b8fb9-fg}`,
+      `  \u2022 ${t("help.monitor.when1")}`,
+      `  \u2022 ${t("help.monitor.when2")}`,
+      `  \u2022 ${t("help.monitor.when3")}`,
+      `  \u2022 ${t("help.monitor.when4")}`,
+    ],
+  },
+  4: {
+    title: t("help.traces.title"),
+    lines: [
+      `{bold}{#a78bfa-fg}\u25C6 ${t("help.traces.title")}{/#a78bfa-fg}{/bold}`,
+      "",
+      t("help.traces.desc"),
+      "",
+      `{#5b8fb9-fg}${t("help.traces.featTitle")}:{/#5b8fb9-fg}`,
+      `  \u2022 ${t("help.traces.feat1")}`,
+      `  \u2022 ${t("help.traces.feat2")}`,
+      `  \u2022 ${t("help.traces.feat3")}`,
+      `  \u2022 ${t("help.traces.feat4")}`,
+      "",
+      `{#546478-fg}${t("help.traces.navNote")}{/#546478-fg}`,
+      "",
+      `{#5b8fb9-fg}${t("help.traces.whenTitle")}:{/#5b8fb9-fg}`,
+      `  \u2022 ${t("help.traces.when1")}`,
+      `  \u2022 ${t("help.traces.when2")}`,
+      `  \u2022 ${t("help.traces.when3")}`,
+      `  \u2022 ${t("help.traces.when4")}`,
+    ],
+  },
+  5: {
+    title: t("help.mcp.title"),
+    lines: [
+      `{bold}{#a78bfa-fg}\u25C6 ${t("help.mcp.title")}{/#a78bfa-fg}{/bold}`,
+      "",
+      t("help.mcp.desc"),
+      "",
+      `{#5b8fb9-fg}${t("help.mcp.actTitle")}:{/#5b8fb9-fg}`,
+      `  \u2022 ${t("help.mcp.act1")}`,
+      `  \u2022 ${t("help.mcp.act2")}`,
+      `  \u2022 ${t("help.mcp.act3")}`,
+      "",
+      `{#546478-fg}${t("help.mcp.intNote")}{/#546478-fg}`,
+      `{#546478-fg}${t("help.mcp.claudeNote")}{/#546478-fg}`,
+      "",
+      `{#5b8fb9-fg}${t("help.mcp.whenTitle")}:{/#5b8fb9-fg}`,
+      `  \u2022 ${t("help.mcp.when1")}`,
+      `  \u2022 ${t("help.mcp.when2")}`,
+      `  \u2022 ${t("help.mcp.when3")}`,
+    ],
+  },
+  6: {
+    title: t("help.plugins.title"),
+    lines: [
+      `{bold}{#e0f2fe-fg}\u25C6 ${t("help.plugins.title")}{/#e0f2fe-fg}{/bold}`,
+      "",
+      t("help.plugins.desc"),
+      "",
+      `{#5b8fb9-fg}${t("help.plugins.featTitle")}:{/#5b8fb9-fg}`,
+      `  \u2022 ${t("help.plugins.feat1")}`,
+      `  \u2022 ${t("help.plugins.feat2")}`,
+      `  \u2022 ${t("help.plugins.feat3")}`,
+      `  \u2022 ${t("help.plugins.feat4")}`,
+      `  \u2022 ${t("help.plugins.feat5")}`,
+      `  \u2022 ${t("help.plugins.feat6")}`,
+      `  \u2022 ${t("help.plugins.feat7")}`,
+      "",
+      `{#5b8fb9-fg}${t("help.plugins.whenTitle")}:{/#5b8fb9-fg}`,
+      `  \u2022 ${t("help.plugins.when1")}`,
+      `  \u2022 ${t("help.plugins.when2")}`,
+      `  \u2022 ${t("help.plugins.when3")}`,
+      `  \u2022 ${t("help.plugins.when4")}`,
+    ],
+  },
+  7: {
+    title: t("help.config.title"),
+    lines: [
+      `{bold}{#8b9bb4-fg}\u25C6 ${t("help.config.title")}{/#8b9bb4-fg}{/bold}`,
+      "",
+      t("help.config.desc"),
+      "",
+      `{#5b8fb9-fg}${t("help.config.setTitle")}:{/#5b8fb9-fg}`,
+      `  \u2022 ${t("help.config.set1")}`,
+      `  \u2022 ${t("help.config.set2")}`,
+      `  \u2022 ${t("help.config.set3")}`,
+      `  \u2022 ${t("help.config.set4")}`,
+      "",
+      `{#5b8fb9-fg}${t("help.config.whenTitle")}:{/#5b8fb9-fg}`,
+      `  \u2022 ${t("help.config.when1")}`,
+      `  \u2022 ${t("help.config.when2")}`,
+      `  \u2022 ${t("help.config.when3")}`,
+      `  \u2022 ${t("help.config.when4")}`,
+    ],
+  },
+};
+
+function showHelpOverlay(): void {
+  const currentIndex = (menuBox as any).selected ?? 0;
+  const help = HELP_TEXTS[currentIndex];
+
+  const helpBox = blessed.box({
+    parent: screen,
+    top: "center", left: "center",
+    width: "60%", height: "70%",
+    tags: true,
+    border: { type: "line" },
+    style: {
+      border: { fg: "#5b8fb9" },
+      bg: "#111820",
+      fg: "#e8edf3",
+    },
+    label: ` {#7ec8e3-fg}{bold}\u25C6 Help \u2500 ${help?.title ?? "eddgate"}{/bold}{/#7ec8e3-fg} `,
+    padding: { left: 2, right: 2, top: 1 },
+    scrollable: true, alwaysScroll: true,
+    keys: true, vi: true, mouse: true,
+    scrollbar: { style: { bg: "#3d5066" } },
+  });
+
+  const lines = [
+    ...(help?.lines ?? []),
+    "",
+    "{#3d5066-fg}\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500{/#3d5066-fg}",
+    "",
+    `{bold}{#5b8fb9-fg}${t("help.keyTitle")}{/#5b8fb9-fg}{/bold}`,
+    "",
+    `  {#7ec8e3-fg}\u2191\u2193{/#7ec8e3-fg}      ${t("help.keyNav")}`,
+    `  {#7ec8e3-fg}Enter{/#7ec8e3-fg}   ${t("help.keyEnter")}`,
+    `  {#7ec8e3-fg}Tab{/#7ec8e3-fg}     ${t("help.keyTab")}`,
+    `  {#7ec8e3-fg}?{/#7ec8e3-fg}       ${t("help.keyHelp")}`,
+    `  {#7ec8e3-fg}q{/#7ec8e3-fg}       ${t("help.keyQuit")}`,
+    `  {#7ec8e3-fg}Esc{/#7ec8e3-fg}     ${t("help.keyEsc")}`,
+    "",
+    "{#3d5066-fg}\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500{/#3d5066-fg}",
+    "",
+    `{bold}{#5b8fb9-fg}${t("help.loopTitle")}{/#5b8fb9-fg}{/bold}`,
+    "",
+    `  {#22d3ee-fg}\u25B6 Run{/#22d3ee-fg}     ${t("help.loopRun")}`,
+    `  {#fbbf24-fg}\u2261 Analyze{/#fbbf24-fg} ${t("help.loopAnalyze")}`,
+    `  {#4ade80-fg}\u2713 Test{/#4ade80-fg}    ${t("help.loopTest")}`,
+    `  {#22d3ee-fg}\u25B6 Run{/#22d3ee-fg}     ${t("help.loopRunAgain")}`,
+    "",
+    "{#546478-fg}Press Esc or q to close this help.{/#546478-fg}",
+  ];
+
+  helpBox.setContent(lines.join("\n"));
+  helpBox.focus();
+  screen.render();
+
+  const close = () => {
+    helpBox.destroy();
+    menuBox.focus();
+    screen.render();
+  };
+  helpBox.key(["escape", "q", "?"], close);
+  helpBox.key(["enter", "space"], close);
+}
+
 
 function quit(): void {
   screen.destroy();
@@ -219,11 +480,41 @@ async function handleRun(): Promise<void> {
     if (opt === "start") {
       optionsDone = true;
     } else if (opt === "report") {
-      const p = await blessedInput(screen, { message: t("run.reportPath") });
-      reportPath = p && p.trim() ? p.trim() : null;
+      const method = await blessedSelect(screen, {
+        message: isKo ? "리포트 경로 설정" : "Report path",
+        items: [
+          { value: "browse", label: isKo ? "\u2630 폴더에서 선택" : "\u2630 Browse folder" },
+          { value: "default", label: isKo ? "\u25C6 기본 (./report.html)" : "\u25C6 Default (./report.html)" },
+          { value: "type", label: isKo ? "\u270E 직접 입력" : "\u270E Type manually" },
+        ],
+      });
+      if (method === "browse") {
+        const p = await blessedFileBrowser(screen, { label: isKo ? "리포트 저장 폴더" : "Report folder" });
+        reportPath = p ? p : null;
+      } else if (method === "default") {
+        reportPath = "./report.html";
+      } else if (method === "type") {
+        const p = await blessedInput(screen, { message: t("run.reportPath") });
+        reportPath = p && p.trim() ? p.trim() : null;
+      }
     } else if (opt === "trace") {
-      const p = await blessedInput(screen, { message: t("run.tracePath") });
-      tracePath = p && p.trim() ? p.trim() : null;
+      const method = await blessedSelect(screen, {
+        message: isKo ? "트레이스 경로 설정" : "Trace path",
+        items: [
+          { value: "browse", label: isKo ? "\u2630 폴더에서 선택" : "\u2630 Browse folder" },
+          { value: "default", label: isKo ? "\u25C6 기본 (./traces/)" : "\u25C6 Default (./traces/)" },
+          { value: "type", label: isKo ? "\u270E 직접 입력" : "\u270E Type manually" },
+        ],
+      });
+      if (method === "browse") {
+        const p = await blessedFileBrowser(screen, { label: isKo ? "트레이스 폴더" : "Trace folder" });
+        tracePath = p ? p : null;
+      } else if (method === "default") {
+        tracePath = "./traces/";
+      } else if (method === "type") {
+        const p = await blessedInput(screen, { message: t("run.tracePath") });
+        tracePath = p && p.trim() ? p.trim() : null;
+      }
     } else if (opt === "budget") {
       const b = await blessedInput(screen, { message: t("run.budget") });
       maxBudget = b && !isNaN(Number(b)) ? Number(b) : null;
@@ -364,6 +655,8 @@ async function handleRun(): Promise<void> {
 }
 
 async function handleAnalyze(): Promise<void> {
+  const lang = t("meta.lang") ?? "en";
+  const isKo = lang === "ko";
   const action = await blessedSelect(screen, {
     message: t("menu.analyze"),
     items: [
@@ -392,9 +685,10 @@ async function handleAnalyze(): Promise<void> {
     });
     if (!wf) return;
 
-    const promptA = await blessedInput(screen, { message: "Prompt A file (e.g. templates/prompts/analyzer.md)" });
+    await blessedMessage(screen, "{#7ec8e3-fg}\u25C6 A/B Test{/#7ec8e3-fg}\n\nVariant A: baseline prompt\nVariant B: new/modified prompt\n\n{#546478-fg}Select prompt files from your prompts directory.{/#546478-fg}", { label: "Help", height: 10 });
+    const promptA = await blessedFileBrowser(screen, { label: isKo ? "Variant A \u2500 \uAE30\uBCF8 \uD504\uB86C\uD504\uD2B8 \uC120\uD0DD" : "Variant A \u2500 Select baseline prompt" });
     if (!promptA) return;
-    const promptB = await blessedInput(screen, { message: "Prompt B file (e.g. templates/prompts/analyzer.v2.md)" });
+    const promptB = await blessedFileBrowser(screen, { label: isKo ? "Variant B \u2500 \uBCC0\uACBD\uB41C \uD504\uB86C\uD504\uD2B8 \uC120\uD0DD" : "Variant B \u2500 Select modified prompt" });
     if (!promptB) return;
 
     const inputMethod = await blessedSelect(screen, {
@@ -737,6 +1031,7 @@ async function handleSettings(): Promise<void> {
 }
 
 async function handlePlugins(): Promise<void> {
+  const isKo = (t("meta.lang") ?? "en") === "ko";
   const action = await blessedSelect(screen, {
     message: "Plugins",
     items: [
@@ -849,7 +1144,20 @@ async function handlePlugins(): Promise<void> {
     });
     if (!stepId) return;
 
-    const inputVal = await blessedInput(screen, { message: "Input text" });
+    const inputMethod2 = await blessedSelect(screen, {
+      message: isKo ? "\uC785\uB825 \uBC29\uBC95" : "Input method",
+      items: [
+        { value: "file", label: isKo ? "\u2630 \uD30C\uC77C \uC120\uD0DD" : "\u2630 Select file" },
+        { value: "text", label: isKo ? "\u270E \uC9C1\uC811 \uC785\uB825" : "\u270E Type text" },
+      ],
+    });
+    if (!inputMethod2) return;
+    let inputVal: string | null;
+    if (inputMethod2 === "file") {
+      inputVal = await blessedFileBrowser(screen, { label: isKo ? "\uC785\uB825 \uD30C\uC77C" : "Select input file" });
+    } else {
+      inputVal = await blessedInput(screen, { message: isKo ? "\uC785\uB825 \uD14D\uC2A4\uD2B8" : "Input text" });
+    }
     if (!inputVal) return;
 
     await runCapturedCommand(`Step: ${stepId}`, "cyan", async () => {
@@ -932,7 +1240,8 @@ async function renderRunPanel(): Promise<string> {
     "", `  {bold}${t("panel.gates")}{/bold}`,
     `    ${t("panel.tier1")}  {green-fg}${t("panel.tier1Hint")}{/green-fg}`,
     `    ${t("panel.tier2")}  {yellow-fg}${t("panel.tier2Hint")}{/yellow-fg}`,
-    "", `  {gray-fg}${t("panel.pressEnterRun")}{/gray-fg}`,
+    "", `  {#546478-fg}${t("panel.pressEnterRun")}{/#546478-fg}`,
+    `  {#3d5066-fg}${t("help.pressHint")}{/#3d5066-fg}`,
   );
   return lines.join("\n");
 }
@@ -952,7 +1261,8 @@ async function renderAnalyzePanel(): Promise<string> {
     `    {yellow-fg}>{/yellow-fg} ${t("panel.contextProfiler")}`, "",
     `  {bold}${t("panel.loopConnection")}{/bold}`,
     `    {gray-fg}${t("panel.rulesAutoLoaded")}{/gray-fg}`, "",
-    `  {gray-fg}${t("panel.pressEnterAnalyze")}{/gray-fg}`,
+    `  {#546478-fg}${t("panel.pressEnterAnalyze")}{/#546478-fg}`,
+    `  {#3d5066-fg}${t("help.pressHint")}{/#3d5066-fg}`,
   ].join("\n");
 }
 
@@ -970,7 +1280,8 @@ async function renderTestPanel(): Promise<string> {
     `  {green-fg}list{/green-fg}      ${t("panel.listDesc")}`, "",
     `  {bold}${t("panel.ciIntegration")}{/bold}`,
     `    {red-fg}${t("panel.exitOnRegression")}{/red-fg}`, "",
-    `  {gray-fg}${t("panel.pressEnterTest")}{/gray-fg}`,
+    `  {#546478-fg}${t("panel.pressEnterTest")}{/#546478-fg}`,
+    `  {#3d5066-fg}${t("help.pressHint")}{/#3d5066-fg}`,
   ].join("\n");
 }
 
@@ -992,7 +1303,8 @@ async function renderMonitorPanel(): Promise<string> {
     `  {cyan-fg}-{/cyan-fg} ${t("panel.monitorStatus")}`,
     `  {cyan-fg}-{/cyan-fg} ${t("panel.monitorCost")}`,
     `  {cyan-fg}-{/cyan-fg} ${t("panel.monitorQuality")}`, "",
-    `  {gray-fg}${t("panel.pressEnterMonitor")}{/gray-fg}`,
+    `  {#546478-fg}${t("panel.pressEnterMonitor")}{/#546478-fg}`,
+    `  {#3d5066-fg}${t("help.pressHint")}{/#3d5066-fg}`,
   ].join("\n");
 }
 
@@ -1008,7 +1320,7 @@ async function renderTracesPanel(): Promise<string> {
   if (files.length > 10) {
     lines.push(`    {gray-fg}... +${files.length - 10} more{/gray-fg}`);
   }
-  lines.push("", `  {gray-fg}${t("panel.pressEnterTraces")}{/gray-fg}`);
+  lines.push("", `  {#546478-fg}${t("panel.pressEnterTraces")}{/#546478-fg}`, `  {#3d5066-fg}${t("help.pressHint")}{/#3d5066-fg}`);
   return lines.join("\n");
 }
 
@@ -1042,7 +1354,7 @@ async function renderMcpPanel(): Promise<string> {
     lines.push("    {gray-fg}No Claude Code MCP servers found.{/gray-fg}");
   }
 
-  lines.push("", `  {gray-fg}${t("panel.pressEnterManage")}{/gray-fg}`);
+  lines.push("", `  {#546478-fg}${t("panel.pressEnterManage")}{/#546478-fg}`, `  {#3d5066-fg}${t("help.pressHint")}{/#3d5066-fg}`);
   return lines.join("\n");
 }
 
@@ -1058,7 +1370,8 @@ async function renderSettingsPanel(): Promise<string> {
     "", `  {bold}{blue-fg}${t("panel.settingsTitle")}{/blue-fg}{/bold}`, "",
     `  {bold}Model:{/bold}     ${model}`,
     `  {bold}Language:{/bold}  ${lang === "ko" ? "한국어" : "English"}`, "",
-    `  {gray-fg}${t("panel.pressEnterModify")}{/gray-fg}`,
+    `  {#546478-fg}${t("panel.pressEnterModify")}{/#546478-fg}`,
+    `  {#3d5066-fg}${t("help.pressHint")}{/#3d5066-fg}`,
   ].join("\n");
 }
 
@@ -1109,45 +1422,81 @@ async function runCapturedCommand(label: string, color: string, fn: () => Promis
   menuBox.hide();
   contentBox.hide();
 
-  const outputBox = blessed.log({
+  // ── Liquid Glass style: frosted panel with soft border + accent scrollbar ──
+  const headerBar = blessed.box({
     parent: screen,
-    top: 1, left: 0, width: "100%", height: "100%-2",
+    top: 1, left: 0, width: "100%", height: 1,
     tags: true,
-    border: { type: "line" },
-    style: { border: { fg: color } },
-    label: ` ${label} `,
-    scrollable: true, alwaysScroll: true,
-    scrollbar: { style: { bg: color } },
-    mouse: true,
-    padding: { left: 1 },
+    style: { bg: "#111820", fg: "#7ec8e3" },
+    content: ` {bold}\u25C6 ${label}{/bold}  {gray-fg}\u2500 Press q/Esc when done{/gray-fg}`,
   });
 
+  const outputBox = blessed.log({
+    parent: screen,
+    top: 2, left: 0, width: "100%", height: "100%-3",
+    tags: true,
+    border: { type: "line" },
+    style: {
+      border: { fg: "#3d5066" },
+      bg: "#0a0e14",
+      fg: "#e8edf3",
+      scrollbar: { bg: "#3d5066" },
+    },
+    label: ` {${color}-fg}${label}{/${color}-fg} `,
+    scrollable: true, alwaysScroll: true,
+    scrollbar: { style: { bg: "#5b8fb9" } },
+    mouse: true, keys: true, vi: true,
+    padding: { left: 1, right: 1 },
+  });
+
+  const statusHint = blessed.box({
+    parent: screen,
+    bottom: 0, left: 0, width: "100%", height: 1,
+    tags: true,
+    style: { bg: "#0a0e14", fg: "#546478" },
+    content: ` {cyan-fg}\u2191\u2193{/cyan-fg} scroll  {cyan-fg}q{/cyan-fg}/{cyan-fg}Esc{/cyan-fg} return  {cyan-fg}Space{/cyan-fg} page down`,
+  });
+
+  // Strip ANSI escape codes from chalk and convert to blessed tags
   const origLog = console.log;
   const origError = console.error;
-  console.log = (...args: unknown[]) => { outputBox.log(args.map(String).join(" ")); screen.render(); };
+  console.log = (...args: unknown[]) => {
+    const line = args.map(String).join(" ");
+    // Strip chalk ANSI codes -- blessed uses its own tag system
+    const cleaned = line.replace(/\x1b\[[0-9;]*m/g, "");
+    outputBox.log(cleaned);
+    screen.render();
+  };
   console.error = console.log;
 
   const origExit = process.exit;
   (process as any).exit = () => {};
 
+  const startTime = Date.now();
   try {
     await fn();
   } catch (err) {
-    outputBox.log(`{red-fg}Error: ${err instanceof Error ? err.message : String(err)}{/red-fg}`);
+    outputBox.log(`{red-fg}\u2717 Error: ${err instanceof Error ? err.message : String(err)}{/red-fg}`);
   }
+  const elapsed = Date.now() - startTime;
 
   console.log = origLog;
   console.error = origError;
   (process as any).exit = origExit;
 
-  outputBox.log("\n{gray-fg}Press any key to return...{/gray-fg}");
+  // Final status line with elapsed time
+  const elapsedStr = elapsed < 1000 ? `${elapsed}ms` : `${(elapsed / 1000).toFixed(1)}s`;
+  outputBox.log(`\n{gray-fg}\u2500\u2500\u2500 Completed in ${elapsedStr}. Press any key to return. \u2500\u2500\u2500{/gray-fg}`);
+  outputBox.focus();
   screen.render();
 
   await new Promise<void>((res) => {
     screen.onceKey(["escape", "q", "enter", "space"], () => res());
   });
 
+  headerBar.destroy();
   outputBox.destroy();
+  statusHint.destroy();
   menuBox.show();
   contentBox.show();
   menuBox.focus();

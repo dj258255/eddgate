@@ -9,24 +9,24 @@ import { t } from "../i18n/index.js";
 
 function textBar(value: number, max: number, width = 20): string {
   const filled = max > 0 ? Math.round((value / max) * width) : 0;
-  return "=".repeat(filled) + " ".repeat(width - filled);
+  return "\u2588".repeat(filled) + "\u2591".repeat(width - filled);
 }
 
 function textGauge(percent: number): string {
   const w = 30;
   const filled = Math.round((percent / 100) * w);
-  const color = percent >= 70 ? "green" : percent >= 40 ? "yellow" : "red";
-  const bar = "=".repeat(filled) + "-".repeat(w - filled);
+  const color = percent >= 70 ? "#4ade80" : percent >= 40 ? "#fbbf24" : "#f87171";
+  const bar = "\u2588".repeat(filled) + "\u2591".repeat(w - filled);
   return `{${color}-fg}[${bar}]{/${color}-fg} ${percent}%`;
 }
 
 function textTable(headers: string[], rows: string[][], colWidths: number[]): string {
-  const sep = colWidths.map((w) => "-".repeat(w)).join("-+-");
-  const hdr = headers.map((h, i) => h.padEnd(colWidths[i])).join(" | ");
+  const sep = colWidths.map((w) => "\u2500".repeat(w)).join("\u2500\u253c\u2500");
+  const hdr = headers.map((h, i) => h.padEnd(colWidths[i])).join(" \u2502 ");
   const lines = [
     `{bold}${hdr}{/bold}`,
-    `{gray-fg}${sep}{/gray-fg}`,
-    ...rows.map((row) => row.map((c, i) => c.padEnd(colWidths[i])).join(" | ")),
+    `{#546478-fg}${sep}{/#546478-fg}`,
+    ...rows.map((row) => row.map((c, i) => c.padEnd(colWidths[i])).join(" \u2502 ")),
   ];
   return lines.join("\n");
 }
@@ -76,7 +76,7 @@ export async function showMonitorStatus(screen: any): Promise<void> {
     ).split("\n").map((l) => "  " + l).join("\n")}`,
   ].join("\n");
 
-  await showPanel(screen, " Monitor: Status ", content, "cyan");
+  await showPanel(screen, " Monitor: Status ", content, "#7ec8e3");
 }
 
 export async function showMonitorCost(screen: any): Promise<void> {
@@ -118,7 +118,7 @@ export async function showMonitorCost(screen: any): Promise<void> {
   ];
   for (const [model, data] of modelEntries) {
     const bar = textBar(data.cost, maxModelCost, 25);
-    lines.push(`  {cyan-fg}${model.padEnd(14)}{/cyan-fg} {green-fg}${bar}{/green-fg} $${data.cost.toFixed(4)}`);
+    lines.push(`  {#7ec8e3-fg}${model.padEnd(14)}{/#7ec8e3-fg} {#4ade80-fg}${bar}{/#4ade80-fg} $${data.cost.toFixed(4)}`);
   }
 
   lines.push(
@@ -137,7 +137,7 @@ export async function showMonitorCost(screen: any): Promise<void> {
     ).split("\n").map((l) => "  " + l).join("\n")}`,
   );
 
-  await showPanel(screen, " Monitor: Cost ", lines.join("\n"), "green");
+  await showPanel(screen, " Monitor: Cost ", lines.join("\n"), "#4ade80");
 }
 
 export async function showMonitorQuality(screen: any): Promise<void> {
@@ -181,11 +181,11 @@ export async function showMonitorQuality(screen: any): Promise<void> {
   for (const [step, scores] of byStep) {
     const avg = scores.reduce((s, x) => s + x, 0) / scores.length;
     const bar = textBar(avg, 1.0, 20);
-    const color = avg >= 0.7 ? "green" : avg >= 0.4 ? "yellow" : "red";
+    const color = avg >= 0.7 ? "#4ade80" : avg >= 0.4 ? "#fbbf24" : "#f87171";
     lines.push(`  ${step.padEnd(16)} {${color}-fg}${bar}{/${color}-fg} ${avg.toFixed(2)}`);
   }
 
-  await showPanel(screen, " Monitor: Quality ", lines.join("\n"), "yellow");
+  await showPanel(screen, " Monitor: Quality ", lines.join("\n"), "#fbbf24");
 }
 
 // ─── Trace Viewer Panel ─────────────────────────────────
@@ -221,7 +221,7 @@ export async function showTraceTimeline(screen: any, filePath: string): Promise<
     parent: screen,
     top: 1, left: 0, width: "100%", height: 3,
     tags: true,
-    style: { bg: "black" },
+    style: { bg: "#0a0e14" },
     padding: { left: 1 },
     content:
       ` {bold}Trace:{/bold} ${traceId}...` +
@@ -243,7 +243,7 @@ export async function showTraceTimeline(screen: any, filePath: string): Promise<
     tags: true,
     label: " Steps ",
     border: { type: "line" },
-    style: { border: { fg: "gray" } },
+    style: { border: { fg: "#2a3a4a" }, label: { fg: "#8b9bb4" } },
     padding: { left: 1 },
     scrollable: true,
     mouse: true,
@@ -255,10 +255,10 @@ export async function showTraceTimeline(screen: any, filePath: string): Promise<
     const evalEvt = events.find((e) => e.stepId === sid && e.type === "evaluation");
     const errEvt = events.find((e) => e.stepId === sid && e.type === "error");
 
-    let status = "{green-fg}ok{/green-fg}";
-    if (errEvt) status = "{red-fg}err{/red-fg}";
-    else if (evalEvt && !evalEvt.data.evaluationResult?.passed) status = "{yellow-fg}flag{/yellow-fg}";
-    else if (!end) status = "{gray-fg}...{/gray-fg}";
+    let status = "{#4ade80-fg}\u2713{/#4ade80-fg}";
+    if (errEvt) status = "{#f87171-fg}\u2717{/#f87171-fg}";
+    else if (evalEvt && !evalEvt.data.evaluationResult?.passed) status = "{#fbbf24-fg}\u26A0{/#fbbf24-fg}";
+    else if (!end) status = "{#546478-fg}\u25CB{/#546478-fg}";
 
     const ms = end ? ` ${fmtMs(end.data.latencyMs)}` : "";
     stepLines.push(`[${status}] ${sid}${ms}`);
@@ -272,60 +272,60 @@ export async function showTraceTimeline(screen: any, filePath: string): Promise<
     tags: true,
     label: " Timeline ",
     border: { type: "line" },
-    style: { border: { fg: "cyan" } },
+    style: { border: { fg: "#7ec8e3" }, label: { fg: "#7ec8e3" } },
     scrollable: true,
     alwaysScroll: true,
-    scrollbar: { style: { bg: "cyan" } },
+    scrollbar: { style: { bg: "#3d5066" } },
     keys: true, vi: true, mouse: true,
     padding: { left: 1 },
   });
 
   for (const event of events) {
     const time = new Date(event.timestamp).toLocaleTimeString();
-    const step = event.stepId === "__workflow__" ? "" : ` {gray-fg}[${event.stepId}]{/gray-fg}`;
+    const step = event.stepId === "__workflow__" ? "" : ` {#546478-fg}[${event.stepId}]{/#546478-fg}`;
 
     switch (event.type) {
       case "workflow_start":
-        logBox.log(`{gray-fg}${time}{/gray-fg} {bold}START{/bold}${step} ${event.data.output}`);
+        logBox.log(`{#546478-fg}${time}{/#546478-fg} {bold}\u25B6 START{/bold}${step} ${event.data.output}`);
         break;
       case "workflow_end": {
-        const color = event.data.output === "success" ? "green" : event.data.output === "partial" ? "yellow" : "red";
-        logBox.log(`{gray-fg}${time}{/gray-fg} {bold}{${color}-fg}END{/${color}-fg}{/bold}${step} ${event.data.output} (${fmtMs(event.data.latencyMs)})`);
+        const color = event.data.output === "success" ? "#4ade80" : event.data.output === "partial" ? "#fbbf24" : "#f87171";
+        logBox.log(`{#546478-fg}${time}{/#546478-fg} {bold}{${color}-fg}\u25C6 END{/${color}-fg}{/bold}${step} ${event.data.output} (${fmtMs(event.data.latencyMs)})`);
         break;
       }
       case "step_start":
-        logBox.log(`{gray-fg}${time}{/gray-fg} {cyan-fg}STEP{/cyan-fg}${step} -> ${event.context?.identity.role ?? ""}`);
+        logBox.log(`{#546478-fg}${time}{/#546478-fg} {#7ec8e3-fg}\u2192 STEP{/#7ec8e3-fg}${step} -> ${event.context?.identity.role ?? ""}`);
         break;
       case "step_end":
-        logBox.log(`{gray-fg}${time}{/gray-fg} {cyan-fg}STEP{/cyan-fg}${step} <- ${fmtMs(event.data.latencyMs)} (${((event.data.inputTokens ?? 0) + (event.data.outputTokens ?? 0)).toLocaleString()} tok)`);
+        logBox.log(`{#546478-fg}${time}{/#546478-fg} {#7ec8e3-fg}\u2192 STEP{/#7ec8e3-fg}${step} <- ${fmtMs(event.data.latencyMs)} (${((event.data.inputTokens ?? 0) + (event.data.outputTokens ?? 0)).toLocaleString()} tok)`);
         break;
       case "llm_call":
-        logBox.log(`{gray-fg}${time}{/gray-fg} {blue-fg}LLM{/blue-fg}${step} ${event.data.model} (${event.data.inputTokens}->${event.data.outputTokens}, ${fmtMs(event.data.latencyMs)})`);
+        logBox.log(`{#546478-fg}${time}{/#546478-fg} {#60a5fa-fg}\u2022 LLM{/#60a5fa-fg}${step} ${event.data.model} (${event.data.inputTokens}->${event.data.outputTokens}, ${fmtMs(event.data.latencyMs)})`);
         break;
       case "validation": {
         const vr = event.data.validationResult;
-        const icon = vr?.passed ? "{green-fg}PASS{/green-fg}" : "{red-fg}FAIL{/red-fg}";
-        logBox.log(`{gray-fg}${time}{/gray-fg} ${icon}${step}`);
+        const icon = vr?.passed ? "{#4ade80-fg}\u2713 PASS{/#4ade80-fg}" : "{#f87171-fg}\u2717 FAIL{/#f87171-fg}";
+        logBox.log(`{#546478-fg}${time}{/#546478-fg} ${icon}${step}`);
         if (vr && !vr.passed) {
           for (const f of vr.failures) {
-            logBox.log(`         {red-fg}${f.rule.message}{/red-fg}`);
+            logBox.log(`         {#f87171-fg}${f.rule.message}{/#f87171-fg}`);
           }
         }
         break;
       }
       case "evaluation": {
         const er = event.data.evaluationResult;
-        const icon = er?.passed ? "{green-fg}EVAL{/green-fg}" : "{yellow-fg}EVAL{/yellow-fg}";
-        logBox.log(`{gray-fg}${time}{/gray-fg} ${icon}${step} score=${er?.score.toFixed(2)}`);
+        const icon = er?.passed ? "{#4ade80-fg}\u2713 EVAL{/#4ade80-fg}" : "{#fbbf24-fg}\u26A0 EVAL{/#fbbf24-fg}";
+        logBox.log(`{#546478-fg}${time}{/#546478-fg} ${icon}${step} score=${er?.score.toFixed(2)}`);
         break;
       }
       case "retrieval": {
         const chunks = event.data.retrievalResults ?? [];
-        logBox.log(`{gray-fg}${time}{/gray-fg} {magenta-fg}RETR{/magenta-fg}${step} ${chunks.length} chunks`);
+        logBox.log(`{#546478-fg}${time}{/#546478-fg} {#a78bfa-fg}\u25C6 RETR{/#a78bfa-fg}${step} ${chunks.length} chunks`);
         break;
       }
       case "error":
-        logBox.log(`{gray-fg}${time}{/gray-fg} {red-fg}ERR{/red-fg}${step} ${event.data.error}`);
+        logBox.log(`{#546478-fg}${time}{/#546478-fg} {#f87171-fg}\u2717 ERR{/#f87171-fg}${step} ${event.data.error}`);
         break;
     }
   }
@@ -333,8 +333,8 @@ export async function showTraceTimeline(screen: any, filePath: string): Promise<
   const statusBar = blessed.box({
     parent: screen,
     bottom: 0, left: 0, width: "100%", height: 1,
-    tags: true, style: { bg: "black" },
-    content: " {cyan-fg}Tab{/cyan-fg} switch  {cyan-fg}Esc{/cyan-fg} back  {cyan-fg}up/down{/cyan-fg} scroll",
+    tags: true, style: { bg: "#0a0e14" },
+    content: " {#7ec8e3-fg}Tab{/#7ec8e3-fg} switch  {#7ec8e3-fg}Esc{/#7ec8e3-fg} back  {#7ec8e3-fg}up/down{/#7ec8e3-fg} scroll",
   });
 
   logBox.focus();
@@ -359,8 +359,8 @@ export async function showTraceTimeline(screen: any, filePath: string): Promise<
 // ─── Post-Run Results Panel ─────────────────────────────
 
 export function showRunResults(screen: any, result: WorkflowResult): Promise<void> {
-  const statusColor = result.status === "success" ? "green" : result.status === "partial" ? "yellow" : "red";
-  const statusIcon = result.status === "success" ? "OK" : result.status === "partial" ? "PARTIAL" : "FAILED";
+  const statusColor = result.status === "success" ? "#4ade80" : result.status === "partial" ? "#fbbf24" : "#f87171";
+  const statusIcon = result.status === "success" ? "\u2713" : result.status === "partial" ? "\u26A0" : "\u2717";
 
   const lines = [
     "",
@@ -368,16 +368,16 @@ export function showRunResults(screen: any, result: WorkflowResult): Promise<voi
     "",
     `  Time:   ${(result.totalDurationMs / 1000).toFixed(1)}s`,
     `  Tokens: ${(result.totalTokens.input + result.totalTokens.output).toLocaleString()}`,
-    `  Cost:   {green-fg}$${result.totalCostEstimate.toFixed(4)}{/green-fg}`,
-    `  Trace:  {gray-fg}${result.traceId.slice(0, 12)}{/gray-fg}`,
+    `  Cost:   {#4ade80-fg}$${result.totalCostEstimate.toFixed(4)}{/#4ade80-fg}`,
+    `  Trace:  {#546478-fg}${result.traceId.slice(0, 12)}{/#546478-fg}`,
     "",
     `  ${textTable(
       ["Step", "Status", "Time", "Tokens", "Eval"],
       result.steps.map((step) => {
-        const st = step.status === "success" ? "{green-fg}ok{/green-fg}" :
-                   step.status === "flagged" ? "{yellow-fg}flag{/yellow-fg}" :
-                   step.status === "skipped" ? "{gray-fg}skip{/gray-fg}" :
-                   "{red-fg}FAIL{/red-fg}";
+        const st = step.status === "success" ? "{#4ade80-fg}\u2713{/#4ade80-fg}" :
+                   step.status === "flagged" ? "{#fbbf24-fg}\u26A0{/#fbbf24-fg}" :
+                   step.status === "skipped" ? "{#546478-fg}\u25CB{/#546478-fg}" :
+                   "{#f87171-fg}\u2717{/#f87171-fg}";
         const tokens = step.tokenUsage.input + step.tokenUsage.output;
         const evalStr = step.evaluation ? step.evaluation.score.toFixed(2) : "-";
         return [
@@ -410,7 +410,7 @@ function waitForKey(screen: any): Promise<void> {
 }
 
 async function showEmptyPanel(screen: any, message: string): Promise<void> {
-  await showPanel(screen, " Info ", `\n\n  {gray-fg}${message}{/gray-fg}`, "gray");
+  await showPanel(screen, " Info ", `\n\n  {#546478-fg}${message}{/#546478-fg}`, "#2a3a4a");
 }
 
 function showPanel(screen: any, label: string, content: string, borderColor: string): Promise<void> {
@@ -420,10 +420,10 @@ function showPanel(screen: any, label: string, content: string, borderColor: str
     tags: true,
     label,
     border: { type: "line" },
-    style: { border: { fg: borderColor } },
+    style: { border: { fg: borderColor }, label: { fg: borderColor } },
     scrollable: true,
     alwaysScroll: true,
-    scrollbar: { style: { bg: borderColor } },
+    scrollbar: { style: { bg: "#3d5066" } },
     keys: true, vi: true, mouse: true,
     padding: { left: 1, right: 1 },
     content,
@@ -431,8 +431,8 @@ function showPanel(screen: any, label: string, content: string, borderColor: str
   const bar = blessed.box({
     parent: screen,
     bottom: 0, left: 0, width: "100%", height: 1,
-    tags: true, style: { bg: "black" },
-    content: " {cyan-fg}Esc{/cyan-fg} back  {cyan-fg}up/down{/cyan-fg} scroll",
+    tags: true, style: { bg: "#0a0e14" },
+    content: " {#7ec8e3-fg}Esc{/#7ec8e3-fg} back  {#7ec8e3-fg}up/down{/#7ec8e3-fg} scroll",
   });
   box.focus();
   screen.render();

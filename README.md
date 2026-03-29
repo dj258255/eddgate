@@ -50,6 +50,45 @@ That's it. A full-screen terminal UI launches. Select Run, Analyze, or Test from
 
 Everything happens inside the TUI: workflow execution with live dashboard, failure analysis, regression testing, MCP server management, plugin import, language switching.
 
+## When Do I Use This?
+
+eddgate is for **any multi-step AI task where quality matters**. If you're copy-pasting into ChatGPT and hoping for the best, eddgate replaces that with a repeatable, verifiable pipeline.
+
+### Real scenarios
+
+| I want to... | Workflow to use | What I feed in | What I get out |
+|---|---|---|---|
+| Summarize a long report with proper citations | `document-pipeline` | `report.pdf` or `report.md` | Structured summary with `[1]` citations and reference list |
+| Translate technical docs to Korean and verify accuracy | `translation` | `docs/api-guide.md` (English) | Korean translation + accuracy verification score |
+| Review a pull request diff for bugs | `code-review` | `git diff > changes.txt` | Issue list with severity, line references, fix suggestions |
+| Debug a production error | `bug-fix` | Error log pasted as text | Root cause analysis + fix proposal + verification |
+| Answer questions from company documents | `rag-pipeline` | Question text (docs pre-indexed) | Grounded answer with source citations, hallucination score |
+| Process customer complaints into structured data | Custom workflow | `complaints.csv` or email text | JSON with categories, urgency, recommended actions |
+
+### First time? Start here
+
+```bash
+eddgate                    # launch TUI
+# 1. Select "Run" from menu
+# 2. Pick "document-pipeline" (or any workflow)
+# 3. Choose "Select file" -> pick any .txt or .md file
+# 4. Model: Sonnet (default, good enough for most tasks)
+# 5. Choose "Dry run" first to see the structure without spending
+# 6. When ready, choose "Start run" and watch the live dashboard
+```
+
+After the run, check the results panel. If quality looks good, enable "Save JSONL trace" on the next run -- that trace file is what powers Analyze, Test, and Monitor.
+
+### The typical workflow
+
+```
+Day 1:  Run with trace enabled -> get baseline results
+Day 2:  Analyze failures -> auto-generate rules
+Day 3:  Run again -> rules auto-applied, quality improves
+Day 4:  Test snapshot -> save this good state
+Day N:  Edit prompt -> Test diff -> verify no regression -> deploy
+```
+
 ### CLI mode (for CI/automation)
 
 All TUI actions are also available as CLI commands for scripting and CI pipelines:
@@ -85,7 +124,7 @@ No other tool does this. Promptfoo evaluates. Braintrust monitors. LangWatch tra
 
 ## Validation Gates
 
-Every step hits a gate. Fail = pipeline stops.
+**What are these?** Automatic quality checkpoints between each step. If a step produces garbage, the pipeline stops immediately instead of wasting tokens on the next step. You don't need to configure these -- they're defined in the workflow YAML and run automatically.
 
 ```
 input -> [Step 1] -> [GATE] -> [Step 2] -> [GATE] -> [Step 3] -> [GATE] -> output
@@ -99,6 +138,8 @@ Two tiers:
 - **Tier 2**: LLM-as-judge. Groundedness/relevance. Key transitions only.
 
 ## Failure Analysis
+
+**When to use**: You ran a workflow and the results were bad (failed steps, low quality scores, unexpected outputs). This command reads your trace files and tells you *what* went wrong, *how often*, and *how to fix it*. It can also auto-generate rules that prevent the same failure next time.
 
 ```bash
 eddgate analyze -d traces
@@ -126,6 +167,8 @@ Generated rules are auto-loaded on next `eddgate run`.
 
 ## Regression Testing
 
+**When to use**: Your pipeline works well and you want to make sure future changes (prompt edits, model switches, config tweaks) don't break it. Think of it like unit tests for your AI pipeline.
+
 ```bash
 eddgate test snapshot -d traces     # save baseline
 # ... modify prompts ...
@@ -146,6 +189,8 @@ eddgate test diff -d traces         # compare against baseline
 CI exit code 1 on regression. Plug into GitHub Actions.
 
 ## Context Window Profiler
+
+**When to use**: Your workflow costs more than expected, or takes too long. The profiler reads your traces and shows exactly which step is burning the most tokens (= money). Common finding: a validation step retrying 48 times when it should retry 2.
 
 ```bash
 eddgate analyze -d traces --context
@@ -271,7 +316,7 @@ All TUI actions are also available as commands for scripting and CI pipelines.
 
 ## RAG Pipeline (Pinecone MCP)
 
-Index documents into Pinecone, then use vector search in workflows.
+**When to use**: You have a folder of company documents (PDFs, markdown, text files) and want AI to answer questions based on those documents instead of making things up. First index the documents, then use `rag-pipeline` workflow to query them.
 
 ```bash
 # Index documents
@@ -302,7 +347,7 @@ Requires Pinecone MCP server configured in `eddgate.config.yaml`.
 
 ## A/B Prompt Testing
 
-Compare two prompt variants on the same workflow and input.
+**When to use**: You rewrote a prompt and want to know if the new version is actually better, not just different. Runs both versions on the same input and uses a statistical test (Welch's t-test) to determine if the difference is real or just random noise.
 
 ```bash
 eddgate advanced ab-test \
@@ -329,7 +374,7 @@ Output:
   Score advantage: 0.077
 ```
 
-Winner logic: higher score wins. If scores within 0.02, lower cost wins.
+Winner logic: uses Welch's t-test (p < 0.05) to determine statistical significance. Reports p-value and 95% confidence interval. Runs are interleaved (ABABAB) to eliminate ordering bias.
 
 ## Workflow Definition
 
@@ -399,14 +444,16 @@ Auto-detects backend:
 
 ## Built-in Workflows
 
-| Workflow | Steps | Use |
-|----------|-------|-----|
-| document-pipeline | 8 | Document processing with citation |
-| code-review | 3 | Diff analysis, issues, report |
-| bug-fix | 4 | Reproduce, root cause, fix, verify |
-| api-design | 3 | Requirements, endpoints, docs |
-| translation | 3 | Analyze, translate, verify |
-| rag-pipeline | 4 | Query classify, vector search, grounded generation, validate |
+| Workflow | What to feed in | What you get | Steps |
+|----------|----------------|-------------|-------|
+| `document-pipeline` | Any long document (.md, .txt, .pdf text) -- e.g. a 30-page policy doc | Structured summary with `[1]` citations, organized by topic, with reference list | 8 |
+| `code-review` | A diff file (`git diff > changes.txt`) or code snippet | Issue list: severity, line numbers, what's wrong, how to fix | 3 |
+| `bug-fix` | Error log, stack trace, or bug description text | Root cause analysis + proposed fix + verification that the fix works | 4 |
+| `api-design` | Requirements doc or feature description | OpenAPI-style endpoint design + request/response examples + docs | 3 |
+| `translation` | Any text file in source language | Translated text + back-translation accuracy score (catches mistranslations) | 3 |
+| `rag-pipeline` | A question (docs must be indexed first via Plugins > RAG) | Answer grounded in your documents + source citations + hallucination score | 4 |
+
+Don't see what you need? Copy any YAML, edit the steps, and you have a custom workflow. Or import one via **Plugins > Import workflow**.
 
 ## Evaluation Thresholds
 
