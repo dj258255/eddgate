@@ -101,7 +101,7 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
 
 // ─── Failure Extraction ──────────────────────────────────────
 
-function extractFailures(events: TraceEvent[]): FailureInstance[] {
+export function extractFailures(events: TraceEvent[]): FailureInstance[] {
   const failures: FailureInstance[] = [];
 
   for (const event of events) {
@@ -149,7 +149,7 @@ function extractFailures(events: TraceEvent[]): FailureInstance[] {
 
 // ─── Clustering: step + type + score band ────────────────────
 
-function clusterFailures(failures: FailureInstance[]): FailureCluster[] {
+export function clusterFailures(failures: FailureInstance[]): FailureCluster[] {
   // Group by step + type (NOT by message -- that's what caused 6 clusters for 1 problem)
   const groups = new Map<string, FailureInstance[]>();
 

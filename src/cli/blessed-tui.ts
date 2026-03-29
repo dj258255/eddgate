@@ -662,6 +662,7 @@ async function handleAnalyze(): Promise<void> {
     items: [
       { value: "failure", label: t("panel.clusterPatterns") },
       { value: "context", label: t("panel.contextProfiler") },
+      { value: "improve", label: isKo ? "프롬프트 자동 개선" : "Auto-improve prompts", hint: isKo ? "실패 패턴 기반 프롬프트 수정 제안" : "suggest prompt fixes from failures" },
       { value: "eval", label: "Offline eval (re-score traces)" },
       { value: "ab-test", label: "A/B prompt test (compare variants)" },
       { value: "diff-eval", label: "Diff eval (compare between commits)" },
@@ -669,6 +670,12 @@ async function handleAnalyze(): Promise<void> {
     ],
   });
   if (!action) return;
+
+  if (action === "improve") {
+    await handlePromptImprove(isKo);
+    await updateContent(1);
+    return;
+  }
 
   if (action === "eval") {
     await handleOfflineEval();
@@ -757,6 +764,142 @@ async function handleAnalyze(): Promise<void> {
     await analyzeCommand({ dir: "./traces", context: ctx, generateRules: gen, output: "./eval/rules" });
   });
   await updateContent(1);
+}
+
+async function handlePromptImprove(isKo: boolean): Promise<void> {
+  const tracesDir = resolve("./traces");
+  let events;
+  try {
+    events = await loadAllTraces(tracesDir);
+  } catch {
+    await blessedMessage(screen, isKo ? "트레이스를 불러올 수 없습니다." : "Could not load traces.", { label: "Error" });
+    return;
+  }
+
+  if (events.length === 0) {
+    await blessedMessage(screen, isKo ? "트레이스가 없습니다. 워크플로를 먼저 실행하세요." : "No traces found. Run a workflow first.", { label: "Info" });
+    return;
+  }
+
+  const { extractFailures, clusterFailures } = await import("./commands/analyze.js");
+  const failures = extractFailures(events);
+  if (failures.length === 0) {
+    await blessedMessage(screen, isKo ? "실패 패턴이 없습니다. 프롬프트가 양호합니다." : "No failures found. Prompts look good!", { label: "Info" });
+    return;
+  }
+
+  const clusters = clusterFailures(failures);
+
+  // Determine prompts directory
+  let promptsDir = resolve("./prompts");
+  try { await readdir(promptsDir); } catch { promptsDir = resolve("./templates/prompts"); }
+
+  await blessedMessage(screen, isKo
+    ? `${clusters.length}개 실패 클러스터 발견. LLM으로 프롬프트 개선을 생성합니다...`
+    : `Found ${clusters.length} failure cluster(s). Generating prompt improvements via LLM...`,
+    { label: isKo ? "프롬프트 개선" : "Prompt Improve", height: 5 });
+
+  const { suggestPromptImprovements } = await import("../core/prompt-improver.js");
+  let result;
+  try {
+    result = await suggestPromptImprovements({
+      clusters: clusters.map(c => ({
+        stepId: c.stepId,
+        failureType: c.failureType,
+        description: c.description,
+        count: c.count,
+        fix: c.fix,
+        avgScore: c.avgScore,
+        instances: c.instances,
+      })),
+      promptsDir,
+    });
+  } catch (err) {
+    await blessedMessage(screen, `{red-fg}Error: ${err instanceof Error ? err.message : String(err)}{/red-fg}`, { label: "Error" });
+    return;
+  }
+
+  if (result.patches.length === 0) {
+    await blessedMessage(screen, isKo ? "제안할 프롬프트 개선이 없습니다." : "No prompt improvements suggested.", { label: "Info" });
+    return;
+  }
+
+  // Review each patch with human-in-the-loop
+  let applied = 0;
+  let skipped = 0;
+
+  for (const patch of result.patches) {
+    // Show diff summary
+    const origLines = patch.originalContent.split("\n").length;
+    const sugLines = patch.suggestedContent.split("\n").length;
+    const diffSummary = [
+      `{bold}{cyan-fg}${patch.role}{/cyan-fg}{/bold}  (${patch.promptFile})`,
+      "",
+      `{yellow-fg}Confidence:{/yellow-fg} ${patch.confidence}`,
+      `{yellow-fg}Reason:{/yellow-fg} ${patch.reason}`,
+      `{yellow-fg}Pattern:{/yellow-fg} ${patch.failurePattern}`,
+      "",
+      "{bold}--- Original ---{/bold}  (${origLines} lines)",
+      "",
+      patch.originalContent.slice(0, 600) + (patch.originalContent.length > 600 ? "\n..." : ""),
+      "",
+      "{bold}--- Suggested ---{/bold}  (${sugLines} lines)",
+      "",
+      patch.suggestedContent.slice(0, 600) + (patch.suggestedContent.length > 600 ? "\n..." : ""),
+    ].join("\n");
+
+    await blessedMessage(screen, diffSummary, {
+      label: isKo ? ` ${patch.stepId} - 변경 내용 ` : ` ${patch.stepId} - Proposed Change `,
+    });
+
+    // Ask user: approve / modify / skip
+    const decision = await blessedSelect(screen, {
+      message: isKo ? `${patch.role}: 적용 방법 선택` : `${patch.role}: Choose action`,
+      items: [
+        { value: "approve", label: isKo ? "승인 (파일에 적용)" : "Approve (write to file)" },
+        { value: "modify", label: isKo ? "수정 후 적용" : "Modify then apply" },
+        { value: "skip", label: isKo ? "건너뛰기" : "Skip" },
+      ],
+    });
+
+    if (decision === "approve") {
+      try {
+        await writeFile(patch.promptFile, patch.suggestedContent, "utf-8");
+        applied++;
+        await blessedMessage(screen, `{green-fg}Applied: ${patch.promptFile}{/green-fg}`, { label: "OK", height: 5 });
+      } catch (err) {
+        await blessedMessage(screen, `{red-fg}Write failed: ${err}{/red-fg}`, { label: "Error", height: 5 });
+      }
+    } else if (decision === "modify") {
+      const modified = await blessedInput(screen, {
+        message: isKo ? "수정된 프롬프트 (첫 줄 입력 후 Enter)" : "Modified prompt (enter first line, Enter to confirm)",
+        defaultValue: patch.suggestedContent.split("\n")[0],
+      });
+      if (modified && modified.trim()) {
+        // For TUI, use the full suggested content but let user adjust the key first line
+        // In practice, the user edits and we write the result
+        const finalContent = modified.trim().length < patch.suggestedContent.length / 2
+          ? modified.trim() + "\n" + patch.suggestedContent.split("\n").slice(1).join("\n")
+          : modified.trim();
+        try {
+          await writeFile(patch.promptFile, finalContent, "utf-8");
+          applied++;
+          await blessedMessage(screen, `{green-fg}Modified and applied: ${patch.promptFile}{/green-fg}`, { label: "OK", height: 5 });
+        } catch (err) {
+          await blessedMessage(screen, `{red-fg}Write failed: ${err}{/red-fg}`, { label: "Error", height: 5 });
+        }
+      } else {
+        skipped++;
+      }
+    } else {
+      skipped++;
+    }
+  }
+
+  const summary = isKo
+    ? `완료: ${applied}개 적용, ${skipped}개 건너뜀\n분석 토큰: ${result.analysisTokens.toLocaleString()}`
+    : `Done: ${applied} applied, ${skipped} skipped\nAnalysis tokens: ${result.analysisTokens.toLocaleString()}`;
+  await blessedMessage(screen, summary, { label: isKo ? "결과" : "Summary", height: 7 });
 }
 
 async function handleOfflineEval(): Promise<void> {

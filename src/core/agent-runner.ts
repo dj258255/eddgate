@@ -43,6 +43,7 @@ interface RunAgentOptions {
   input: string;
   rolePrompt?: string;
   tracer: TraceEmitter;
+  memoryInsights?: string;
 }
 
 interface AgentOutput {
@@ -57,9 +58,9 @@ export async function runAgent(
   options: RunAgentOptions,
   maxRetries = 3,
 ): Promise<AgentOutput> {
-  const { stepId, context, input, rolePrompt, tracer } = options;
+  const { stepId, context, input, rolePrompt, tracer, memoryInsights } = options;
 
-  const systemPrompt = buildSystemPrompt(context, rolePrompt);
+  const systemPrompt = buildSystemPrompt(context, rolePrompt, memoryInsights);
   const model = context.identity.model ?? "sonnet";
 
   const fullInput = context.memory?.previousStepOutput

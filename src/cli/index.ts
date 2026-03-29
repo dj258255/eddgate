@@ -183,6 +183,23 @@ function launchCLI(): void {
       topK: parseInt(opts.topK), threshold: opts.threshold ? parseFloat(opts.threshold) : undefined,
     }));
 
+  // Prompt Improve
+  advanced.command("improve")
+    .description("Auto-suggest prompt improvements from failure analysis")
+    .option("-d, --dir <path>", "Traces directory", "./traces")
+    .option("--prompts <path>", "Prompts directory", "./templates/prompts")
+    .option("--apply", "Auto-apply without review")
+    .option("--dry-run", "Show suggestions without applying")
+    .action(async (opts) => {
+      const { improveCommand } = await import("./commands/improve.js");
+      await improveCommand({
+        dir: opts.dir,
+        promptsDir: opts.prompts,
+        apply: opts.apply,
+        dryRun: opts.dryRun,
+      });
+    });
+
   // A/B Test
   advanced.command("ab-test")
     .description("A/B prompt comparison test")
@@ -199,6 +216,23 @@ function launchCLI(): void {
       input: opts.input, iterations: parseInt(opts.iterations), model: opts.model,
       workflowsDir: opts.workflowsDir, promptsDir: opts.promptsDir,
     }));
+
+  program
+    .command("serve")
+    .description("Start API server for workflow execution")
+    .option("-p, --port <number>", "port", "3000")
+    .option("--host <host>", "host", "127.0.0.1")
+    .option("-w, --workflows-dir <path>", "workflows directory", "./templates/workflows")
+    .option("--prompts <path>", "prompts directory", "./templates/prompts")
+    .action(async (opts) => {
+      const { serveCommand } = await import("./commands/serve.js");
+      await serveCommand({
+        port: parseInt(opts.port, 10),
+        host: opts.host,
+        workflowsDir: opts.workflowsDir,
+        promptsDir: opts.prompts,
+      });
+    });
 
   program.parse();
 }

@@ -327,6 +327,7 @@ function getPrimaryDependencyOutput(
 export function buildSystemPrompt(
   context: ExecutionContext,
   rolePrompt?: string,
+  memoryInsights?: string,
 ): string {
   const parts: string[] = [];
 
@@ -346,6 +347,11 @@ export function buildSystemPrompt(
   // Previous step context (if available)
   if (context.memory?.summary) {
     parts.push("## Previous Step Summary\n" + context.memory.summary);
+  }
+
+  // Cross-run memory insights
+  if (memoryInsights) {
+    parts.push(memoryInsights);
   }
 
   return parts.join("\n\n");

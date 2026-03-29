@@ -9,6 +9,7 @@ import type {
 import type { EvaluationResult } from "../types/index.js";
 import { buildContext } from "./context-builder.js";
 import { runAgent } from "./agent-runner.js";
+import { saveRunMemory, loadRunMemory, buildMemoryPrompt } from "./run-memory.js";
 import { validateOutput } from "../eval/tier1-rules.js";
 import { runTier2Evaluation } from "../eval/tier2-llm.js";
 import { TraceEmitter } from "../trace/emitter.js";
@@ -50,6 +51,10 @@ export async function executeWorkflow(
   const stepResults: StepResult[] = [];
   let accumulatedCost = 0;
 
+  // Load cross-run memory
+  const memory = await loadRunMemory(workflow.name);
+  const memoryPrompt = buildMemoryPrompt(memory);
+
   const workflowStart = performance.now();
   tracer.workflowStart(workflow.name);
 
@@ -76,6 +81,7 @@ export async function executeWorkflow(
           modelOverrides,
           false,
           orderedSteps,
+          memoryPrompt,
         );
       }));
 
@@ -135,6 +141,7 @@ export async function executeWorkflow(
         modelOverrides,
         false,
         orderedSteps,
+        memoryPrompt,
       );
 
       results.set(step.id, stepResult);
@@ -159,7 +166,7 @@ export async function executeWorkflow(
             tracer.emit(step.id, "step_start", { output: `workflow-retry ${retryAttempt + 1}/2` });
             const retryResult = await executeStep(
               step, input, results, workflow.config.defaultModel,
-              rolePrompts?.get(step.context.identity.role), tracer, modelOverrides, true, orderedSteps,
+              rolePrompts?.get(step.context.identity.role), tracer, modelOverrides, true, orderedSteps, memoryPrompt,
             );
             results.set(step.id, retryResult);
             stepResults[stepResults.length - 1] = retryResult;
@@ -194,13 +201,33 @@ export async function executeWorkflow(
 
   tracer.workflowEnd(status, totalMs);
 
-  return buildWorkflowResult(
+  const result = buildWorkflowResult(
     workflow.name,
     tracer.getTraceId(),
     status,
     stepResults,
     workflowStart,
   );
+
+  // Save to cross-run memory (non-blocking)
+  saveRunMemory({
+    timestamp: new Date().toISOString(),
+    workflowName: workflow.name,
+    traceId: tracer.getTraceId(),
+    status: result.status,
+    totalTokens: result.totalTokens.input + result.totalTokens.output,
+    totalCost: result.totalCostEstimate,
+    durationMs: result.totalDurationMs,
+    stepResults: result.steps.map((s) => ({
+      stepId: s.stepId,
+      status: s.status,
+      evalScore: s.evaluation?.score,
+      error: s.error,
+    })),
+    insights: [],
+  }).catch(() => {}); // Non-blocking, don't fail the workflow
+
+  return result;
 }
 
 // ─── Step Execution ──────────────────────────────────────────
@@ -215,6 +242,7 @@ async function executeStep(
   modelOverrides?: { classify?: string; generate?: string; validate?: string },
   _isRetry = false, // true = inside retryStep, skip nested retries
   allSteps?: StepDefinition[],
+  memoryInsights?: string,
 ): Promise<StepResult> {
   const stepStart = performance.now();
   const context = buildContext(step, previousResults, defaultModel, modelOverrides, allSteps);
@@ -296,6 +324,7 @@ async function executeStep(
       input: stepInput,
       rolePrompt,
       tracer,
+      memoryInsights,
     });
 
     let output: unknown = agentOutput.text;
@@ -361,6 +390,7 @@ async function executeStep(
             rolePrompt,
             tracer,
             step.evaluation.maxRetries ?? 2,
+            memoryInsights,
           );
           if (retried) return retried;
         }
@@ -454,6 +484,7 @@ async function retryStep(
   rolePrompt: string | undefined,
   tracer: TraceEmitter,
   maxRetries: number,
+  memoryInsights?: string,
 ): Promise<StepResult | null> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     tracer.emit(step.id, "step_start", {
@@ -470,6 +501,7 @@ async function retryStep(
       undefined, // modelOverrides
       true, // _isRetry = true -- no nested retries
       undefined, // allSteps -- not available in retry context
+      memoryInsights,
     );
 
     if (result.status === "success" || result.status === "flagged") {
