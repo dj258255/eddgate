@@ -715,7 +715,7 @@ eddgate/
 
 비관적 분석 결과 (CRITICAL_ANALYSIS.md + 추가 검증):
 - **순수 플러그인**: 7단계 프롬프트 기반 = 32% E2E 성공률, eddgate 핵심 가치(결정적 검증, 재현성) 파괴
-- **순수 CLI**: 진입 장벽 높음 (API 키 + 크레딧), MetaGPT/CrewAI 레드오션
+- **순수 CLI**: 진입 장벽 높음 (API 키 + 크레딧), 경쟁 과열 시장
 - **2-Tier**: 코어 가치 유지 + 진입 장벽 제거
 
 ### Tier 구조
@@ -785,12 +785,3 @@ eddgate/
 - Claude Code 플러그인 래퍼
 - 웹 대시보드
 
----
-
-## 경쟁 포지셔닝 (최종)
-
-<p align="center">
-  <img src="diagrams/competitive-positioning.svg" alt="경쟁 포지셔닝" width="560">
-</p>
-
-**한 줄 포지셔닝**: "평가가 내장된 실용적 멀티에이전트 CLI. Ruflo의 야심 없이, SWE-Agent의 단순함으로, eddgate의 정신을."

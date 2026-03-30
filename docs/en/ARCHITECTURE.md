@@ -715,7 +715,7 @@ eddgate/
 
 Pessimistic analysis results (CRITICAL_ANALYSIS.md + additional verification):
 - **Pure plugin**: 7-step prompt-based = 32% E2E success rate, destroys eddgate core value (deterministic validation, reproducibility)
-- **Pure CLI**: High entry barrier (API key + credits), MetaGPT/CrewAI red ocean
+- **Pure CLI**: High entry barrier (API key + credits), crowded market
 - **2-Tier**: Preserves core value + removes entry barrier
 
 ### Tier Structure
@@ -785,12 +785,3 @@ Pessimistic analysis results (CRITICAL_ANALYSIS.md + additional verification):
 - Claude Code plugin wrapper
 - Web dashboard
 
----
-
-## Competitive Positioning
-
-<p align="center">
-  <img src="diagrams/competitive-positioning.svg" alt="Competitive positioning" width="560">
-</p>
-
-**One-line positioning**: "A practical multi-agent CLI with built-in evaluation. Without Ruflo's overambition, with SWE-Agent's simplicity, in the spirit of eddgate."

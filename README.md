@@ -8,7 +8,7 @@
 
 <p align="center">Full-screen terminal UI. Run workflows, analyze failures, auto-generate rules, regression test. One tool, one loop.</p>
 
-> **Coming from Promptfoo?** eddgate closes the loop that Promptfoo left open: failures are analyzed, rules are auto-generated, and applied on the next run. No data sent to any AI provider. Fully self-hosted.
+> Failures are analyzed, rules are auto-generated, and applied on the next run. No data sent to any AI provider. Fully self-hosted.
 
 ```
 run -> analyze -> test -> run (improved) -> ...
@@ -94,7 +94,7 @@ eddgate test diff -d traces           # detect regressions
   <img src="docs/en/diagrams/self-improving-loop.svg" alt="Self-improving loop" width="440">
 </p>
 
-No other tool does this. Promptfoo evaluates. Braintrust monitors. LangWatch traces. None of them close the loop from failure analysis back to execution improvement.
+eddgate closes the loop: failure analysis feeds directly back into execution improvement. One tool, one cycle.
 
 ## Validation Gates
 
