@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 480" fill="none">
+  <style>
+    text { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+    .axis-label { font-size: 12px; fill: #94a3b8; font-weight: 600; }
+    .name { font-size: 12px; fill: #e2e8f0; font-weight: 600; }
+    .desc { font-size: 10px; fill: #64748b; }
+    .target { font-size: 13px; fill: #3b82f6; font-weight: 700; }
+    .target-desc { font-size: 10px; fill: #60a5fa; }
+    .dot { r: 6; }
+    .axis { stroke: #334155; stroke-width: 1; }
+    .quad { stroke: #1e293b; stroke-width: 1; stroke-dasharray: 4,3; }
+  </style>
+
+  <rect width="560" height="480" fill="#0f172a" rx="12"/>
+
+  <!-- Axes -->
+  <line class="axis" x1="80" y1="440" x2="80" y2="40"/>
+  <line class="axis" x1="80" y1="240" x2="520" y2="240"/>
+
+  <!-- Axis labels -->
+  <text class="axis-label" x="300" y="470" text-anchor="middle">eddgate evaluation integration -></text>
+  <text class="axis-label" x="30" y="244" text-anchor="middle" transform="rotate(-90 30 244)">complexity -></text>
+
+  <text class="desc" x="90" y="456">simple</text>
+  <text class="desc" x="480" y="456">integrated</text>
+  <text class="desc" x="68" y="430" text-anchor="end">low</text>
+  <text class="desc" x="68" y="56" text-anchor="end">high</text>
+
+  <!-- Quadrant divider -->
+  <line class="quad" x1="300" y1="40" x2="300" y2="440"/>
+
+  <!-- Competitors -->
+  <!-- Ruflo (top-left) -->
+  <circle class="dot" cx="160" cy="90" fill="#f87171"/>
+  <text class="name" x="178" y="86">Ruflo</text>
+  <text class="desc" x="178" y="100">(ambitious / unproven)</text>
+
+  <!-- LangGraph (top-right quadrant but left of evaluation axis) -->
+  <circle class="dot" cx="420" cy="90" fill="#f87171"/>
+  <text class="name" x="438" y="86">LangGraph</text>
+  <text class="desc" x="438" y="100">(general / non-coding)</text>
+
+  <!-- MetaGPT (mid-left) -->
+  <circle class="dot" cx="120" cy="180" fill="#f87171"/>
+  <text class="name" x="138" y="176">MetaGPT</text>
+  <text class="desc" x="138" y="190">(rigid / abandoned)</text>
+
+  <!-- CrewAI (mid-right) -->
+  <circle class="dot" cx="440" cy="180" fill="#f87171"/>
+  <text class="name" x="458" y="176">CrewAI</text>
+  <text class="desc" x="458" y="190">(memory limitations)</text>
+
+  <!-- Dividing line label -->
+  <text class="desc" x="90" y="232">simple</text>
+
+  <!-- SWE-Agent (bottom-left) -->
+  <circle class="dot" cx="140" cy="330" fill="#f87171"/>
+  <text class="name" x="158" y="326">SWE-Agent</text>
+  <text class="desc" x="158" y="340">(minimal / academic)</text>
+
+  <!-- Aider (bottom-left) -->
+  <circle class="dot" cx="120" cy="390" fill="#f87171"/>
+  <text class="name" x="138" y="386">Aider</text>
+  <text class="desc" x="138" y="400">(single / interactive)</text>
+
+  <!-- eddgate (bottom-right, highlighted) -->
+  <circle cx="430" cy="330" r="10" fill="#3b82f6" opacity="0.3"/>
+  <circle cx="430" cy="330" r="6" fill="#3b82f6"/>
+  <text class="target" x="448" y="326">eddgate CLI</text>
+  <text class="target-desc" x="450" y="342">(practical eddgate)</text>
+
+  <!-- Arrow pointing to eddgate -->
+  <text class="target-desc" x="450" y="362"><- here</text>
+</svg>

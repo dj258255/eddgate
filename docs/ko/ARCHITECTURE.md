@@ -33,26 +33,9 @@ Three things combined that don't exist together anywhere else:
 
 ## 시스템 개요
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      eddgate CLI                              │
-│                                                              │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐    │
-│  │ Context  │  │ Workflow  │  │  Agent   │  │   Eval   │    │
-│  │ Builder  │  │  Engine   │  │  Runner  │  │  Module  │    │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘    │
-│       │              │              │              │          │
-│  ┌────┴──────────────┴──────────────┴──────────────┴────┐    │
-│  │                    Core Bus                           │    │
-│  │         (이벤트 + 구조화 로깅 + 상태 관리)             │    │
-│  └────┬──────────────┬──────────────┬──────────────┬────┘    │
-│       │              │              │              │          │
-│  ┌────┴─────┐  ┌────┴─────┐  ┌────┴─────┐  ┌────┴─────┐   │
-│  │   MCP    │  │  Model   │  │  Trace   │  │  Config  │   │
-│  │ Manager  │  │ Provider │  │  Emitter │  │  Store   │   │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
-└─────────────────────────────────────────────────────────────┘
-```
+<p align="center">
+  <img src="diagrams/system-overview.svg" alt="시스템 개요" width="640">
+</p>
 
 ---
 
@@ -526,23 +509,9 @@ interface TraceOutput {
 
 **로깅 전략**:
 
-```
-stdout (항상)  → 사람이 읽을 수 있는 요약
-  ├── [STEP] classify → 완료 (0.8s, 1.2K tokens)
-  ├── [STEP] retrieve → 완료 (3.2s, 4.5K tokens, 8 links)
-  ├── [EVAL] groundedness → 0.85 (PASS, threshold: 0.7)
-  └── [STEP] generate → 완료 (5.1s, 8.3K tokens)
-
-jsonl (선택적) → 기계가 읽을 수 있는 전체 트레이스
-  → 각 이벤트가 한 줄 JSON
-  → 재현/디버깅/사후 분석용
-
-langfuse (선택적) → 대시보드 시각화
-  → LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY 설정 시 자동 활성화
-
-otel (선택적) → OpenTelemetry 호환 백엔드
-  → Jaeger, Grafana Tempo, Datadog 등
-```
+<p align="center">
+  <img src="diagrams/logging-strategy.svg" alt="로깅 전략" width="580">
+</p>
 
 ---
 
@@ -582,63 +551,9 @@ project/
 
 ## 실행 흐름
 
-```
-사용자 입력
-    │
-    ▼
-┌─ Config Store에서 워크플로우 로드 ─┐
-│                                    │
-│  eddgate run document-pipeline      │
-│  --input "사용자 문의 원문"         │
-│  --config ./eddgate.config.yaml     │
-└────────────────────────────────────┘
-    │
-    ▼
-┌─ Step 1: classify ─────────────────┐
-│  Context Builder → 최소 컨텍스트    │
-│  Agent Runner → 에이전트 실행       │
-│  Tier 1 검증 → 스키마/필수필드      │
-│  Trace Emitter → 이벤트 기록       │
-│  [done] Pass → 다음 단계               │
-│  [no] Fail → 차단, 에러 출력          │
-└────────────────────────────────────┘
-    │
-    ▼
-┌─ Step 2: retrieve ─────────────────┐
-│  (동일 흐름)                        │
-│  도구: web_search MCP 호출          │
-│  Tier 1 검증 → URL 포맷, 링크 수    │
-└────────────────────────────────────┘
-    │
-    ▼
-┌─ Step 3-1~3: generate (3 sub-step) ┐
-│  3-3 완료 시:                       │
-│  Tier 2 LLM 평가 (groundedness)  │
-│  → 0.7 이상: 통과                   │
-│  → 미만: flag 또는 retry            │
-└────────────────────────────────────┘
-    │
-    ▼
-┌─ Step 4: structure ────────────────┐
-│  Tier 1 검증 → 아웃라인 구조        │
-└────────────────────────────────────┘
-    │
-    ▼
-┌─ Step 5: patch ────────────────────┐
-│  FINAL_DRAFT 생성                   │
-└────────────────────────────────────┘
-    │
-    ▼
-┌─ Step 6: validate_final ───────────┐
-│  Tier 2 LLM 평가 (전체 검증)     │
-│  → 모든 규칙 Pass: 완료             │
-│  → Fail 있음: Step 5로 되돌림       │
-│  → maxRetries 초과: 사람에게 넘김    │
-└────────────────────────────────────┘
-    │
-    ▼
-최종 산출물 + 실행 트레이스
-```
+<p align="center">
+  <img src="diagrams/execution-flow.svg" alt="실행 흐름" width="480">
+</p>
 
 **LLM 평가는 2곳에서만**: Step 3 완료 후 (검색→생성 합류) + Step 6 (최종 검증).
 나머지는 전부 규칙 기반 (비용 0, 5-10ms).
@@ -805,31 +720,9 @@ eddgate/
 
 ### Tier 구조
 
-```
-┌───────────────────────────────────────────────┐
-│  Claude Code Plugin (입구, 시장 검증)           │
-│                                               │
-│  /eddgate run document-pipeline                │
-│  - Max 구독으로 무료 실행                       │
-│  - 슬래시 커맨드 → CLI 코어 호출               │
-│  - LLM 호출만 Claude Code로 대체               │
-│  - "best effort" 평가 (솔직 고지)              │
-│                                               │
-│  내부: Hook(command) → Node.js 스크립트 실행    │
-│        → YAML 로드, Zod 검증, 트레이스 기록     │
-│        → 각 단계: Claude에게 작업 지시           │
-├───────────────────────────────────────────────┤
-│  Standalone CLI (본체, 기술적 해자)             │
-│                                               │
-│  eddgate run document-pipeline --input q.txt   │
-│  - 결정적 워크플로우 엔진                       │
-│  - Tier 1: Zod 검증 (오탐 0%)                 │
-│  - 구조화 JSONL 트레이스                       │
-│  - HTML 리포트                                │
-│  - 재현 가능한 실행                            │
-│  - BYOK + CI/CD 통합                          │
-└───────────────────────────────────────────────┘
-```
+<p align="center">
+  <img src="diagrams/two-tier-architecture.svg" alt="2-Tier 아키텍처" width="560">
+</p>
 
 ### 코어가 포기하면 안 되는 것 (기술적 해자)
 
@@ -896,28 +789,8 @@ eddgate/
 
 ## 경쟁 포지셔닝 (최종)
 
-```
-                    복잡도 높음
-                        │
-            Ruflo ●     │     ● LangGraph
-          (야심적/미검증) │   (범용/비코딩특화)
-                        │
-                        │
-  MetaGPT ●────────────┼────────────● CrewAI
-  (경직/방치)           │          (메모리 한계)
-                        │
-                        │
-        ────────────────┼──────────────────
-        단순함           │           eddgate 평가
-                        │            통합
-                        │
-  SWE-Agent ●           │           ● eddgate CLI ← 여기
-  (최소/학술)           │          (실용적 eddgate)
-                        │
-        Aider ●         │
-        (단일/대화형)    │
-                        │
-                    복잡도 낮음
-```
+<p align="center">
+  <img src="diagrams/competitive-positioning.svg" alt="경쟁 포지셔닝" width="560">
+</p>
 
 **한 줄 포지셔닝**: "평가가 내장된 실용적 멀티에이전트 CLI. Ruflo의 야심 없이, SWE-Agent의 단순함으로, eddgate의 정신을."

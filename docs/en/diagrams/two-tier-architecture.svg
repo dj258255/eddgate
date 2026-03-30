@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 440" fill="none">
+  <style>
+    text { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+    .title { font-size: 14px; fill: #e2e8f0; font-weight: 700; }
+    .subtitle { font-size: 11px; fill: #94a3b8; font-style: italic; }
+    .item { font-size: 12px; fill: #cbd5e1; }
+    .detail { font-size: 11px; fill: #94a3b8; }
+    .cmd { font-size: 12px; fill: #38bdf8; font-family: 'SF Mono', monospace; }
+    .divider { stroke: #475569; stroke-width: 1; stroke-dasharray: 4,3; }
+    .box { rx: 10; }
+  </style>
+
+  <rect width="560" height="440" fill="#0f172a" rx="12"/>
+
+  <!-- Plugin tier -->
+  <rect class="box" x="30" y="20" width="500" height="188" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+  <text class="title" x="50" y="46">Claude Code Plugin (entry point, market validation)</text>
+
+  <text class="cmd" x="50" y="72">/eddgate run document-pipeline</text>
+
+  <text class="item" x="50" y="98">- Free execution with Max subscription</text>
+  <text class="item" x="50" y="118">- Slash command -> calls CLI core</text>
+  <text class="item" x="50" y="138">- LLM calls replaced by Claude Code</text>
+  <text class="item" x="50" y="158">"best effort" evaluation (honestly disclosed)</text>
+
+  <text class="detail" x="50" y="184">Internal: Hook(command) -> Node.js script</text>
+  <text class="detail" x="50" y="198">-> YAML load, Zod validation, trace recording</text>
+
+  <!-- Divider -->
+  <line class="divider" x1="30" y1="218" x2="530" y2="218"/>
+
+  <!-- CLI tier -->
+  <rect class="box" x="30" y="228" width="500" height="192" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+  <text class="title" x="50" y="254">Standalone CLI (core, technical moat)</text>
+
+  <text class="cmd" x="50" y="280">eddgate run document-pipeline --input q.txt</text>
+
+  <text class="item" x="50" y="306">- Deterministic workflow engine</text>
+  <text class="item" x="50" y="326">- Tier 1: Zod validation (0% false positives)</text>
+  <text class="item" x="50" y="346">- Structured JSONL traces</text>
+  <text class="item" x="50" y="366">- HTML reports</text>
+  <text class="item" x="50" y="386">- Reproducible execution</text>
+  <text class="item" x="50" y="406">- BYOK + CI/CD integration</text>
+</svg>

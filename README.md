@@ -30,23 +30,9 @@ eddgate
 
 That's it. A full-screen terminal UI launches. Select Run, Analyze, or Test from the menu.
 
-```
-+---------------------------+----------------------------------------------------+
-|  eddgate                  |                                                    |
-+---------------------------+                                                    |
-|                           |                                                    |
-|  > Run                    |   Select a workflow, model, effort level,           |
-|    Analyze                |   and input -- then watch it execute live.          |
-|    Test                   |                                                    |
-|    MCP                    |   Step progress on the left.                       |
-|    Plugins                |   Streaming log on the right.                      |
-|    Settings               |   Tokens, cost, elapsed time in the header.        |
-|    Exit                   |                                                    |
-|                           |                                                    |
-+---------------------------+----------------------------------------------------+
-|  Arrow keys: navigate  |  Enter: select  |  Esc: back  |  q: quit            |
-+------------------------------------------------------------------------+
-```
+<p align="center">
+  <img src="assets/tui-screenshot.png" alt="eddgate TUI screenshot" width="720">
+</p>
 
 Everything happens inside the TUI: workflow execution with live dashboard, failure analysis, regression testing, MCP server management, plugin import, language switching.
 
@@ -104,21 +90,9 @@ eddgate test diff -d traces           # detect regressions
 
 ## The Loop
 
-```
-1. Run            Execute workflow with validation gates
-      |
-2. Analyze        Find failure patterns, auto-generate rules
-      |
-3. Run            Run again -- generated rules auto-applied
-      |
-4. Test snapshot  Save current behavior as baseline
-      |
-   (modify prompts/workflows)
-      |
-5. Test diff      Compare against baseline, catch regressions
-      |
-   ... repeat
-```
+<p align="center">
+  <img src="docs/en/diagrams/self-improving-loop.svg" alt="Self-improving loop" width="440">
+</p>
 
 No other tool does this. Promptfoo evaluates. Braintrust monitors. LangWatch traces. None of them close the loop from failure analysis back to execution improvement.
 
@@ -126,12 +100,9 @@ No other tool does this. Promptfoo evaluates. Braintrust monitors. LangWatch tra
 
 **What are these?** Automatic quality checkpoints between each step. If a step produces garbage, the pipeline stops immediately instead of wasting tokens on the next step. You don't need to configure these -- they're defined in the workflow YAML and run automatically.
 
-```
-input -> [Step 1] -> [GATE] -> [Step 2] -> [GATE] -> [Step 3] -> [GATE] -> output
-                       |                     |                     |
-                     pass?                 pass?                 pass?
-                     fail = STOP           fail = STOP           fail = STOP
-```
+<p align="center">
+  <img src="docs/en/diagrams/validation-gates.svg" alt="Validation gates" width="720">
+</p>
 
 Two tiers:
 - **Tier 1**: Zod schema checks. Deterministic. 0% false positives. 5ms. Every step.
@@ -246,22 +217,9 @@ Options loop back so you can set multiple before starting.
 
 During workflow execution, the TUI shows a live orchestration dashboard:
 
-```
-+---------------------------+----------------------------------------------------+
-|  document-pipeline        |  Workflow: document-pipeline                        |
-|  sonnet | high | 42s      |  Model: sonnet  Effort: high                       |
-+---------------------------+  Elapsed: 42s  Tokens: 12,450  Cost: $0.02         |
-|                           +----------------------------------------------------+
-|  [done] classify_input    |  [STEP START] classify_input -> classifier          |
-|  [done] retrieve_docs     |  [VALIDATION] pass                                 |
-|  [run]  generate_draft    |  [STEP END] done 3.2s (2,100 tokens)               |
-|  [ .. ] validate_final    |  [STEP START] retrieve_docs -> researcher           |
-|  [ .. ] format_output     |  [RETRIEVAL] 3 chunks (avg score: 0.82)            |
-|                           |  [STEP END] done 5.1s (4,350 tokens)               |
-|                           |  [STEP START] generate_draft -> writer              |
-|                           |  ...                                                |
-+---------------------------+----------------------------------------------------+
-```
+<p align="center">
+  <img src="docs/en/diagrams/run-dashboard.svg" alt="Run dashboard" width="720">
+</p>
 
 ## CLI Commands (for CI/automation)
 
@@ -497,16 +455,9 @@ Or from the TUI: **Analyze > Auto-improve prompts**.
 
 ### TUI approval flow
 
-```
-+--- Original Prompt ---+--- Suggested Prompt ---+
-| You are an analyst.   | You are an analyst.    |
-| Extract key topics.   | Extract key topics.    |
-|                       | Output MUST be JSON.   |  <- added
-|                       | Example: {"topics":..} |  <- added
-+-----------------------+------------------------+
-|  [Approve]  [Modify]  [Skip]                   |
-+------------------------------------------------+
-```
+<p align="center">
+  <img src="docs/en/diagrams/prompt-approval.svg" alt="Prompt approval flow" width="520">
+</p>
 
 Each suggestion includes confidence level (high/medium/low) and the failure pattern that triggered it.
 

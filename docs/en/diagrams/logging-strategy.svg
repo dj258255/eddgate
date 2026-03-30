@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 580 320" fill="none">
+  <style>
+    text { font-family: 'SF Mono', 'Cascadia Code', monospace; }
+    .title { font-size: 13px; fill: #e2e8f0; font-weight: 700; }
+    .desc { font-size: 11px; fill: #94a3b8; }
+    .tag { font-size: 10px; font-weight: 600; }
+    .log { font-size: 11px; }
+    .step { fill: #38bdf8; }
+    .eval { fill: #a78bfa; }
+    .ok { fill: #4ade80; }
+    .dim { fill: #64748b; }
+    .connector { stroke: #475569; stroke-width: 1.5; }
+    .box { rx: 8; }
+  </style>
+
+  <rect width="580" height="320" fill="#0f172a" rx="12"/>
+
+  <!-- stdout -->
+  <rect class="box" x="20" y="16" width="540" height="130" fill="#1e293b" stroke="#4ade80" stroke-width="1.5"/>
+  <text class="title" x="40" y="40">stdout (always)</text>
+  <text class="desc" x="200" y="40">Human-readable summary</text>
+
+  <text class="log step" x="44" y="64">[STEP]</text>
+  <text class="log" x="100" y="64" fill="#e2e8f0">classify -> done (0.8s, 1.2K tokens)</text>
+  <text class="log step" x="44" y="82">[STEP]</text>
+  <text class="log" x="100" y="82" fill="#e2e8f0">retrieve -> done (3.2s, 4.5K tokens, 8 links)</text>
+  <text class="log eval" x="44" y="100">[EVAL]</text>
+  <text class="log" x="100" y="100" fill="#e2e8f0">groundedness -> 0.85 (PASS, threshold: 0.7)</text>
+  <text class="log step" x="44" y="118">[STEP]</text>
+  <text class="log" x="100" y="118" fill="#e2e8f0">generate -> done (5.1s, 8.3K tokens)</text>
+
+  <!-- jsonl -->
+  <rect class="box" x="20" y="160" width="260" height="64" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+  <text class="title" x="40" y="184">jsonl (optional)</text>
+  <text class="desc" x="40" y="200">Machine-readable full trace</text>
+  <text class="desc" x="40" y="214">One JSON event per line</text>
+
+  <!-- langfuse -->
+  <rect class="box" x="300" y="160" width="260" height="64" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+  <text class="title" x="320" y="184">langfuse (optional)</text>
+  <text class="desc" x="320" y="200">Dashboard visualization</text>
+  <text class="desc" x="320" y="214">Auto-enabled with API keys</text>
+
+  <!-- otel -->
+  <rect class="box" x="20" y="240" width="540" height="64" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+  <text class="title" x="40" y="264">otel (optional)</text>
+  <text class="desc" x="180" y="264">OpenTelemetry-compatible backend</text>
+  <text class="desc" x="40" y="284">Jaeger, Grafana Tempo, Datadog, etc.</text>
+</svg>

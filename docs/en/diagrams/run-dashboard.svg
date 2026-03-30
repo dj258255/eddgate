@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 380" fill="none">
+  <style>
+    text { font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace; }
+    .header { font-size: 12px; fill: #94a3b8; }
+    .header-val { font-size: 12px; fill: #38bdf8; }
+    .title { font-size: 14px; fill: #e2e8f0; font-weight: 700; }
+    .done { font-size: 12px; fill: #4ade80; }
+    .run { font-size: 12px; fill: #facc15; }
+    .wait { font-size: 12px; fill: #64748b; }
+    .log-step { font-size: 11px; fill: #38bdf8; }
+    .log-pass { font-size: 11px; fill: #4ade80; }
+    .log-end { font-size: 11px; fill: #94a3b8; }
+    .log-info { font-size: 11px; fill: #a78bfa; }
+    .border { stroke: #334155; stroke-width: 1; }
+  </style>
+
+  <rect width="720" height="380" fill="#0f172a" rx="10"/>
+
+  <!-- Top header bar -->
+  <rect x="0" y="0" width="720" height="44" fill="#1e293b" rx="10"/>
+  <rect x="0" y="34" width="720" height="10" fill="#1e293b"/>
+
+  <!-- Header left -->
+  <text class="title" x="16" y="26">document-pipeline</text>
+  <rect x="170" y="12" width="1" height="20" fill="#334155"/>
+  <text class="header" x="184" y="22">sonnet</text>
+  <text class="header" x="226" y="22">|</text>
+  <text class="header" x="236" y="22">high</text>
+  <text class="header" x="264" y="22">|</text>
+  <text class="header-val" x="274" y="22">42s</text>
+
+  <!-- Header right -->
+  <text class="header" x="400" y="18">Workflow:</text>
+  <text class="header-val" x="466" y="18">document-pipeline</text>
+  <text class="header" x="400" y="34">Model:</text>
+  <text class="header-val" x="444" y="34">sonnet</text>
+  <text class="header" x="498" y="34">Effort:</text>
+  <text class="header-val" x="544" y="34">high</text>
+
+  <!-- Metrics bar -->
+  <rect x="320" y="44" width="400" height="28" fill="#172554"/>
+  <text class="header" x="334" y="62">Elapsed:</text>
+  <text class="header-val" x="392" y="62">42s</text>
+  <text class="header" x="432" y="62">Tokens:</text>
+  <text class="header-val" x="486" y="62">12,450</text>
+  <text class="header" x="544" y="62">Cost:</text>
+  <text class="header-val" x="582" y="62">$0.02</text>
+
+  <!-- Divider -->
+  <line class="border" x1="0" y1="72" x2="720" y2="72"/>
+  <line class="border" x1="320" y1="44" x2="320" y2="380"/>
+
+  <!-- Left panel: Step progress -->
+  <rect x="0" y="44" width="320" height="28" fill="#172554"/>
+  <text class="header" x="16" y="62">Steps</text>
+
+  <text class="done" x="24" y="102">[done]</text>
+  <text class="done" x="80" y="102">classify_input</text>
+
+  <text class="done" x="24" y="126">[done]</text>
+  <text class="done" x="80" y="126">retrieve_docs</text>
+
+  <text class="run" x="24" y="150">[run]</text>
+  <text class="run" x="80" y="150">generate_draft</text>
+
+  <text class="wait" x="24" y="174">[ .. ]</text>
+  <text class="wait" x="80" y="174">validate_final</text>
+
+  <text class="wait" x="24" y="198">[ .. ]</text>
+  <text class="wait" x="80" y="198">format_output</text>
+
+  <!-- Right panel: Streaming log -->
+  <text class="log-step" x="336" y="100">[STEP START]</text>
+  <text class="log-end" x="432" y="100">classify_input -> classifier</text>
+
+  <text class="log-pass" x="336" y="122">[VALIDATION]</text>
+  <text class="log-pass" x="424" y="122">pass</text>
+
+  <text class="log-end" x="336" y="144">[STEP END]</text>
+  <text class="log-end" x="416" y="144">done 3.2s (2,100 tokens)</text>
+
+  <text class="log-step" x="336" y="174">[STEP START]</text>
+  <text class="log-end" x="432" y="174">retrieve_docs -> researcher</text>
+
+  <text class="log-info" x="336" y="196">[RETRIEVAL]</text>
+  <text class="log-end" x="420" y="196">3 chunks (avg score: 0.82)</text>
+
+  <text class="log-end" x="336" y="218">[STEP END]</text>
+  <text class="log-end" x="416" y="218">done 5.1s (4,350 tokens)</text>
+
+  <text class="log-step" x="336" y="248">[STEP START]</text>
+  <text class="log-end" x="432" y="248">generate_draft -> writer</text>
+
+  <text class="log-end" x="336" y="270">...</text>
+</svg>
