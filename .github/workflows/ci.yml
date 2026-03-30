@@ -27,11 +27,23 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      - name: Lint
+        run: npm run lint
+
       - name: Build
         run: npm run build
 
       - name: Unit tests
         run: npm test
+
+      - name: Architecture boundary tests
+        run: npm run test:arch
+
+      - name: Secret scan
+        run: npm run guard:secrets
+
+      - name: Dependency audit
+        run: npm audit --audit-level=high || true
 
       - name: Dry-run all workflows
         run: |

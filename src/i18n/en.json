@@ -20,6 +20,8 @@
     "config": "Settings",
     "configHint": "model, traces, language",
     "exit": "Exit",
+    "exitDesc": "Quit eddgate.",
+    "exitHint": "You can also press q or Ctrl+C to quit.",
     "back": "Back",
     "bye": "bye"
   },
@@ -84,10 +86,10 @@
     "list": "List servers",
     "add": "Add new server",
     "remove": "Remove server",
-    "serverName": "Server name",
+    "serverName": "Server name (e.g. pinecone, github, jira)",
     "transport": "Transport",
-    "command": "Command",
-    "url": "URL",
+    "command": "Command (e.g. npx -y @modelcontextprotocol/server-github)",
+    "url": "Server URL (e.g. http://localhost:3100/mcp)",
     "added": "Added",
     "removed": "Removed",
     "noServers": "No MCP servers configured."

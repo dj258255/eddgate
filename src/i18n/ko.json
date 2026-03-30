@@ -20,6 +20,8 @@
     "config": "설정",
     "configHint": "모델, 트레이스, 언어",
     "exit": "종료",
+    "exitDesc": "eddgate를 종료합니다.",
+    "exitHint": "q 또는 Ctrl+C로도 종료할 수 있습니다.",
     "back": "돌아가기",
     "bye": "bye"
   },
@@ -84,10 +86,10 @@
     "list": "서버 목록",
     "add": "새 서버 추가",
     "remove": "서버 제거",
-    "serverName": "서버 이름",
+    "serverName": "서버 이름 (예: pinecone, github, jira)",
     "transport": "전송 방식",
-    "command": "명령어",
-    "url": "URL",
+    "command": "실행 명령어 (예: npx -y @modelcontextprotocol/server-github)",
+    "url": "서버 URL (예: http://localhost:3100/mcp)",
     "added": "추가됨",
     "removed": "제거됨",
     "noServers": "MCP 서버가 설정되어 있지 않습니다."

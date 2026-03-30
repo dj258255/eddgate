@@ -1,5 +1,6 @@
-import { readFileSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { readFileSync, existsSync } from "node:fs";
+import { resolve, join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
 
 export type Lang = "ko" | "en";
@@ -51,18 +52,46 @@ export function t(path: string): string {
   return typeof current === "string" ? current : path;
 }
 
-function loadStrings(lang: Lang): void {
+function findLangFile(lang: Lang): string | null {
+  const candidates: string[] = [];
+
+  // 1. import.meta.dirname (Node 21.2+)
+  if (import.meta.dirname) {
+    candidates.push(join(import.meta.dirname, `${lang}.json`));
+  }
+
+  // 2. fileURLToPath fallback (Node 20)
   try {
-    // Try to load from file first (works in dev)
-    const filePath = join(import.meta.dirname ?? ".", `${lang}.json`);
-    const raw = readFileSync(filePath, "utf-8");
-    strings = JSON.parse(raw);
-  } catch {
-    // Fallback: inline minimal strings
-    if (lang === "ko") {
-      strings = { menu: { whatToDo: "무엇을 하시겠습니까?", exit: "종료", back: "돌아가기", bye: "bye" } };
-    } else {
-      strings = { menu: { whatToDo: "What do you want to do?", exit: "Exit", back: "Back", bye: "bye" } };
-    }
+    const dir = dirname(fileURLToPath(import.meta.url));
+    candidates.push(join(dir, `${lang}.json`));
+  } catch { /* eval mode -- import.meta.url is undefined */ }
+
+  // 3. src/i18n/ (dev mode with tsx)
+  candidates.push(resolve("src/i18n", `${lang}.json`));
+
+  // 4. dist/i18n/ (built mode, cwd = project root)
+  candidates.push(resolve("dist/i18n", `${lang}.json`));
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+function loadStrings(lang: Lang): void {
+  const filePath = findLangFile(lang);
+  if (filePath) {
+    try {
+      const raw = readFileSync(filePath, "utf-8");
+      strings = JSON.parse(raw);
+      return;
+    } catch { /* fall through to fallback */ }
+  }
+
+  // Fallback: inline minimal strings
+  if (lang === "ko") {
+    strings = { menu: { whatToDo: "무엇을 하시겠습니까?", exit: "종료", back: "돌아가기", bye: "bye" } };
+  } else {
+    strings = { menu: { whatToDo: "What do you want to do?", exit: "Exit", back: "Back", bye: "bye" } };
   }
 }

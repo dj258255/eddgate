@@ -13,3 +13,5 @@ test-input.txt
 test-output.md
 test-report.html
 firebase-debug.log
+metrics/
+session/session-state.json

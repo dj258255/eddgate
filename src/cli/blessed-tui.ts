@@ -131,7 +131,7 @@ export async function launchBlessedTUI(): Promise<void> {
 
 // ─── Help System ──────────────────────────────────────
 
-const HELP_TEXTS: Record<number, { title: string; lines: string[] }> = {
+function buildHelpTexts(): Record<number, { title: string; lines: string[] }> { return {
   0: {
     title: t("help.run.title"),
     lines: [
@@ -314,11 +314,11 @@ const HELP_TEXTS: Record<number, { title: string; lines: string[] }> = {
       `  \u2022 ${t("help.config.when4")}`,
     ],
   },
-};
+}; }
 
 function showHelpOverlay(): void {
   const currentIndex = (menuBox as any).selected ?? 0;
-  const help = HELP_TEXTS[currentIndex];
+  const help = buildHelpTexts()[currentIndex];
 
   const helpBox = blessed.box({
     parent: screen,
@@ -1363,8 +1363,21 @@ async function updateContent(index: number): Promise<void> {
     case 5: contentBox.setContent(await renderMcpPanel()); break;
     case 6: contentBox.setContent(await renderPluginsPanel()); break;
     case 7: contentBox.setContent(await renderSettingsPanel()); break;
+    case 8: contentBox.setContent(renderExitPanel()); break;
   }
   screen.render();
+}
+
+function renderExitPanel(): string {
+  return [
+    "",
+    `  {bold}{red-fg}${t("menu.exit")}{/red-fg}{/bold}`,
+    "",
+    `  ${t("menu.exitDesc")}`,
+    "",
+    `  {gray-fg}${t("menu.exitHint")}{/gray-fg}`,
+    "",
+  ].join("\n");
 }
 
 async function renderRunPanel(): Promise<string> {

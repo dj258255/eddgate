@@ -30,10 +30,14 @@
     "build": "tsc && cp src/i18n/*.json dist/i18n/",
     "dev": "tsx src/cli/index.ts",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build",
-    "pretest": "npm run build",
+    "lint": "eslint src/",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:arch": "vitest run tests/arch/ --config vitest.arch.config.ts",
+    "guard:secrets": "bash ./scripts/guard-secrets.sh",
+    "verify": "bash ./scripts/verify.sh",
+    "prepublishOnly": "npm run build",
+    "pretest": "npm run build",
     "clean": "rm -rf dist/"
   },
   "dependencies": {
@@ -66,11 +70,14 @@
   },
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.86",
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.0.0",
     "@types/react": "^19.2.14",
     "@vitest/runner": "^4.1.2",
+    "eslint": "^10.1.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
+    "typescript-eslint": "^8.57.2",
     "vitest": "^3.0.0"
   },
   "engines": {
